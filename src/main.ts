@@ -47,7 +47,7 @@ window.addEventListener("DOMContentLoaded", () => {
           <div class="sidebar-footer">
             <div class="version-info">
               <i data-lucide="info" class="version-icon"></i>
-              <span class="version-text">v0.2.3</span>
+              <span class="version-text">v0.2.4</span>
             </div>
             <button class="check-update-btn" id="checkUpdateBtn">
               <i data-lucide="download" class="update-icon"></i>
@@ -60,7 +60,7 @@ window.addEventListener("DOMContentLoaded", () => {
         <main class="main-content">
           <div class="content-wrapper">
             <h2>Hoş Geldiniz! 🎉</h2>
-            <p>Admin panelinize hoş geldiniz. Tüm işlemlerinizi buradan yönetebilirsiniz.</p>
+            <p>Admin panelinize hoş geldiniz. Tüm işlemlerinizi buradan kolayca yönetebilirsiniz.</p>
           </div>
         </main>
       </div>

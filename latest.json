@@ -1,11 +1,11 @@
 {
-  "version": "0.2.3",
-  "notes": "Güncelleme sistemi düzeltmeleri",
-  "pub_date": "2024-03-14T22:00:00Z",
+  "version": "0.2.4",
+  "notes": "Anasayfa metni güncellendi - 'kolayca' eklendi",
+  "pub_date": "2024-03-14T22:30:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUYlZVaG4yY1hhY0ZpanFjcU11K0ZvcVVsZWE3L2p3UUJ6QjU3RVdHV2k5ZEpIWG9WZ3FZNHIzU0phUndiSC9JLzJlalVyTWdWSU1jaEt6Yy93bmFDVlJkdVBQeDNUcHc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNTA0NDY4CWZpbGU6V2UgSGF2ZSBTYWFTIGF0IEhvbWVfMC4yLjNfeDY0LXNldHVwLmV4ZQowOWZBQ01xb2hpUFhsUzh6QnQ4Zk9OcVpFUTZmSDNlbEd6RzVjZytDT1dQTG5Va0xjdXA0RGpHMTROV2p4aUtNN3B1Y0kyQzBnRytLaldMMk1BTkJEUT09Cg==",
-      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.2.3/We.Have.SaaS.at.Home_0.2.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUYlZVaG4yY1hhY1B4WjhDaUo3WUlkTVZUVGlsMnhIUldqdWxBUXVIbGNOb0I1TUQ4bEJoY0dQWTVBY0hnVEc0dGxwRUVNNENuOUpPMHRDT05GOUM1SkxncWowZkdtRmcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNTA0ODE0CWZpbGU6V2UgSGF2ZSBTYWFTIGF0IEhvbWVfMC4yLjRfeDY0LXNldHVwLmV4ZQpWYTVxSGlhRDVYYlpDcFNYV0w2WjViVVZKdGs0ZTdWOUFpOG5FOHI5eGtGTE9mVnRkTXdsUjg5bldOaExKUmI1dVpxaU5kUUFDdm1PaXBZd0xHYklCUT09Cg==",
+      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.2.4/We.Have.SaaS.at.Home_0.2.4_x64-setup.exe"
     }
   }
 }
