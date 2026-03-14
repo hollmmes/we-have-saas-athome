@@ -18,7 +18,13 @@ export async function checkForUpdates() {
         
         // Güncellemeyi indir ve kur
         await update.downloadAndInstall((progress) => {
-          console.log(`İndirme: ${progress.downloaded} / ${progress.total}`);
+          if (progress.event === 'Started') {
+            console.log('İndirme başladı...');
+          } else if (progress.event === 'Progress') {
+            console.log(`İndirme: ${progress.data.chunkLength} bytes`);
+          } else if (progress.event === 'Finished') {
+            console.log('İndirme tamamlandı!');
+          }
         });
         
         // Uygulamayı yeniden başlat

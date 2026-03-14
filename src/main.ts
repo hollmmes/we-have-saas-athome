@@ -1,4 +1,4 @@
-import { createIcons, LayoutDashboard, Users, Settings, TrendingUp, MessageSquare, Menu } from 'lucide';
+import { createIcons, LayoutDashboard, Users, Settings, TrendingUp, MessageSquare, Menu, Info, Download } from 'lucide';
 import { checkForUpdates } from './updater';
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -44,6 +44,16 @@ window.addEventListener("DOMContentLoaded", () => {
               <span class="nav-text">Messages</span>
             </a>
           </nav>
+          <div class="sidebar-footer">
+            <div class="version-info">
+              <i data-lucide="info" class="version-icon"></i>
+              <span class="version-text">v0.1.0</span>
+            </div>
+            <button class="check-update-btn" id="checkUpdateBtn">
+              <i data-lucide="download" class="update-icon"></i>
+              <span>Güncelleme Kontrol</span>
+            </button>
+          </div>
         </aside>
 
         <!-- Main Content -->
@@ -64,13 +74,21 @@ window.addEventListener("DOMContentLoaded", () => {
         Settings,
         TrendingUp,
         MessageSquare,
-        Menu
+        Menu,
+        Info,
+        Download
       },
       attrs: {
         width: '20',
         height: '20',
         'stroke-width': '2'
       }
+    });
+
+    // Manuel güncelleme kontrolü butonu
+    const checkUpdateBtn = document.getElementById("checkUpdateBtn");
+    checkUpdateBtn?.addEventListener("click", () => {
+      checkForUpdates();
     });
 
     // Sidebar toggle functionality

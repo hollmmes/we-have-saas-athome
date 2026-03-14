@@ -120,6 +120,7 @@ body {
   display: flex;
   flex-direction: column;
   padding: 1rem 0;
+  flex: 1;
 }
 
 .nav-item {
@@ -156,6 +157,61 @@ body {
 .nav-text {
   font-size: 0.9375rem;
   font-weight: 500;
+}
+
+/* Sidebar Footer */
+.sidebar-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.version-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-color);
+  opacity: 0.6;
+}
+
+.version-icon {
+  flex-shrink: 0;
+}
+
+.version-text {
+  font-weight: 500;
+}
+
+.check-update-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.check-update-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.check-update-btn:active {
+  transform: translateY(0);
+}
+
+.update-icon {
+  flex-shrink: 0;
 }
 
 /* Main Content */
