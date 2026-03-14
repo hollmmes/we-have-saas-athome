@@ -3,7 +3,10 @@ import { relaunch } from '@tauri-apps/plugin-process';
 
 export async function checkForUpdates() {
   try {
+    console.log('Güncelleme kontrolü başlıyor...');
     const update = await check();
+    
+    console.log('Update response:', update);
     
     if (update?.available) {
       console.log(`Update available: ${update.version}`);
@@ -14,6 +17,7 @@ export async function checkForUpdates() {
       );
       
       if (shouldUpdate) {
+        alert('Güncelleme indiriliyor...');
         console.log('Güncelleme indiriliyor...');
         
         // Güncellemeyi indir ve kur
@@ -31,9 +35,11 @@ export async function checkForUpdates() {
         await relaunch();
       }
     } else {
+      alert('Uygulama güncel! Mevcut versiyon: 0.1.0');
       console.log('Uygulama güncel');
     }
   } catch (error) {
     console.error('Güncelleme kontrolü hatası:', error);
+    alert('Güncelleme kontrolü hatası: ' + error);
   }
 }

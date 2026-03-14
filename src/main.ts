@@ -47,7 +47,7 @@ window.addEventListener("DOMContentLoaded", () => {
           <div class="sidebar-footer">
             <div class="version-info">
               <i data-lucide="info" class="version-icon"></i>
-              <span class="version-text">v0.2.0</span>
+              <span class="version-text">v0.1.0</span>
             </div>
             <button class="check-update-btn" id="checkUpdateBtn">
               <i data-lucide="download" class="update-icon"></i>

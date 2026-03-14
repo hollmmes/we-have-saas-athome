@@ -5,7 +5,7 @@
   "platforms": {
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.2.0/We.Have.SaaS.at.Home_0.2.0_x64-setup.nsis.zip"
+      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.2.0/We.Have.SaaS.at.Home_0.2.0_x64-setup.exe"
     }
   }
 }
