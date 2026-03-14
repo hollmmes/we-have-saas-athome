@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "We Have SaaS at Home",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "identifier": "com.hollmmes.we-have-saas-athome",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -41,6 +41,14 @@
       ],
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDcwREFDNUQ5Njc0ODU1REIKUldUYlZVaG4yY1hhY0lMU05qY1I4aDgrMG0yampHV0oxRVpCM3BTUC9zbExWd2VLK0UzSE1XcVoK"
+    },
+    "sql": {
+      "scope": {
+        "allowed": [
+          { "path": "$APPDATA/images.db" }
+        ]
+      }
     }
   }
 }
+

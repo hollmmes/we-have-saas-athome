@@ -17,7 +17,6 @@ export async function checkForUpdates() {
       );
       
       if (shouldUpdate) {
-        alert('Güncelleme indiriliyor...');
         console.log('Güncelleme indiriliyor...');
         
         // Güncellemeyi indir ve kur
@@ -34,12 +33,8 @@ export async function checkForUpdates() {
         // Uygulamayı yeniden başlat
         await relaunch();
       }
-    } else {
-      alert('Uygulama güncel!');
-      console.log('Uygulama güncel');
     }
   } catch (error) {
     console.error('Güncelleme kontrolü hatası:', error);
-    alert('Güncelleme kontrolü hatası: ' + error);
   }
 }
