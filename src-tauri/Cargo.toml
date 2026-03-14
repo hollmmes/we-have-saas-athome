@@ -1,6 +1,6 @@
 [package]
 name = "we-have-saas-athome"
-version = "0.2.2"
+version = "0.2.3"
 description = "We Have SaaS at Home by hollmmes"
 authors = ["hollmmes"]
 license = "GPL-3.0"
