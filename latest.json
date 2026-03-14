@@ -1,11 +1,11 @@
 {
-  "version": "0.2.1",
-  "notes": "İlk stabil versiyon - Otomatik güncelleme sistemi aktif",
-  "pub_date": "2024-03-14T20:00:00Z",
+  "version": "0.2.2",
+  "notes": "Türkçe karşılama mesajı eklendi",
+  "pub_date": "2024-03-14T21:00:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "",
-      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.2.1/We.Have.SaaS.at.Home_0.2.1_x64-setup.exe"
+      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.2.2/We.Have.SaaS.at.Home_0.2.2_x64-setup.exe"
     }
   }
 }
