@@ -35,7 +35,7 @@ export async function checkForUpdates() {
         await relaunch();
       }
     } else {
-      alert('Uygulama güncel! Mevcut versiyon: 0.1.0');
+      alert('Uygulama güncel!');
       console.log('Uygulama güncel');
     }
   } catch (error) {
