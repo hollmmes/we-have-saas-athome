@@ -84,7 +84,15 @@ git push origin v0.2.0
 
 ## Lisans
 
-MIT
+Bu proje GNU General Public License v3.0 ile lisanslanmıştır.
+
+Bu, şu anlama gelir:
+- ✅ Kodu özgürce kullanabilir, değiştirebilir ve dağıtabilirsiniz
+- ✅ Ticari amaçlarla kullanabilirsiniz
+- ⚠️ Değişikliklerinizi de GPL ile paylaşmalısınız
+- ⚠️ Kaynak kodu açık kalmalıdır
+
+Detaylar için [LICENSE](./LICENSE) dosyasına bakın.
 
 ---
 
