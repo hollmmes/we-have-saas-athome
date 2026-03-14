@@ -1,177 +1,117 @@
-# Dağıtım ve Güncelleme Rehberi
+# Deployment Guide - v0.3.0
 
-## 1. İlk Kurulum
+## Build Tamamlandı ✓
 
-### Güvenlik Anahtarı Oluşturma
+Build başarıyla tamamlandı ve imzalandı.
+
+### Build Dosyaları
+
+- **NSIS Installer**: `src-tauri/target/release/bundle/nsis/We Have SaaS at Home_0.3.0_x64-setup.exe`
+- **MSI Installer**: `src-tauri/target/release/bundle/msi/We Have SaaS at Home_0.3.0_x64_en-US.msi`
+- **İmza Dosyası**: `src-tauri/target/release/bundle/nsis/We Have SaaS at Home_0.3.0_x64-setup.exe.sig`
+
+### İmza Bilgisi
+
+```
+dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUYlZVaG4yY1hhY0lwNUpYOFZyUGxjNEQ0UFd6ZmgzT1JKS3duZWVxNXN4T3pZZ3hhTHZCcGdRV21rdGlzcmpPY2pGUzlPU0xPdnpqS2V4T0lrcEcxK2phbXZDUVpGa0FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNTI2NjUzCWZpbGU6V2UgSGF2ZSBTYWFTIGF0IEhvbWVfMC4zLjBfeDY0LXNldHVwLmV4ZQpOSHA3LzI1bi9mRytINmhycUtvZmJoZzNPUGY2Y3dHN3RhSVpVSUhHM1lZckMxYjNqRWJMd2haVjlVdkdiOERjZmtkMTcyUEN6NW9vamlybm13MkFCQT09Cg==
+```
+
+## Sonraki Adımlar
+
+### 1. GitHub Release Oluştur
+
+GitHub'da yeni bir release oluştur:
+
+1. GitHub repository'ye git: https://github.com/hollmmes/we-have-saas-athome
+2. "Releases" sekmesine tıkla
+3. "Create a new release" butonuna tıkla
+4. Tag version: `v0.3.0`
+5. Release title: `v0.3.0 - Fotoğraf Dönüştürme Servisi`
+6. Release notes:
+```
+## Yeni Özellikler
+
+### Fotoğraf Dönüştürme Servisi
+- 7 farklı format desteği: PNG, JPG, WebP, GIF, BMP, ICO, TIFF
+- Sürükle-bırak ile kolay dosya yükleme
+- Dosya seçici dialog desteği
+- Çoklu dosya dönüştürme kuyruğu
+- Dönüştürülen fotoğrafları arşivleme
+- Özel çıktı klasörü seçimi
+- Dosya konumunu açma özelliği
+- SQLite ile veri saklama
+
+## Kurulum
+
+Windows için `.exe` dosyasını indirip çalıştırın.
+```
+
+7. **Önemli**: Dosya adını şu formatta yükle:
+   - `We.Have.SaaS.at.Home_0.3.0_x64-setup.exe` (boşlukları nokta ile değiştir)
+   - Dosya yolu: `src-tauri/target/release/bundle/nsis/We Have SaaS at Home_0.3.0_x64-setup.exe`
+
+8. "Publish release" butonuna tıkla
+
+### 2. latest.json'u Commit ve Push Et
+
 ```bash
-npm run tauri signer generate -- -w ~/.tauri/myapp.key
-```
-
-Bu komut iki dosya oluşturur:
-- `myapp.key` - Private key (GİZLİ TUTUN!)
-- `myapp.key.pub` - Public key (tauri.conf.json'a eklenecek)
-
-Public key'i kopyalayıp `src-tauri/tauri.conf.json` dosyasındaki `pubkey` alanına yapıştırın.
-
-## 2. Build Yapma
-
-### Windows için:
-```bash
-npm run tauri build
-```
-
-Build dosyaları: `src-tauri/target/release/bundle/`
-
-### Çıktılar:
-- **Windows**: `.msi` ve `.exe` installer
-- **macOS**: `.dmg` ve `.app`
-- **Linux**: `.deb`, `.AppImage`
-
-## 3. GitHub Releases ile Otomatik Güncelleme
-
-### Adım 1: GitHub Repository Oluştur
-1. GitHub'da yeni repo oluştur
-2. Kodu push'la
-
-### Adım 2: GitHub Actions Workflow Ekle
-
-`.github/workflows/release.yml` dosyası oluştur:
-
-```yaml
-name: Release
-
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  release:
-    strategy:
-      matrix:
-        platform: [windows-latest, ubuntu-latest, macos-latest]
-    
-    runs-on: ${{ matrix.platform }}
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Install dependencies
-        run: npm install
-      
-      - name: Build
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: npm run tauri build
-      
-      - name: Upload Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            src-tauri/target/release/bundle/**/*.msi
-            src-tauri/target/release/bundle/**/*.exe
-            src-tauri/target/release/bundle/**/*.dmg
-            src-tauri/target/release/bundle/**/*.deb
-            src-tauri/target/release/bundle/**/*.AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
-
-### Adım 3: GitHub Secrets Ekle
-Repository Settings > Secrets and variables > Actions:
-
-1. `TAURI_SIGNING_PRIVATE_KEY`: Private key içeriği
-2. `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: Key şifresi (varsa)
-
-### Adım 4: tauri.conf.json'u Güncelle
-
-```json
-"endpoints": [
-  "https://github.com/KULLANICI_ADI/REPO_ADI/releases/latest/download/latest.json"
-]
-```
-
-## 4. Yeni Versiyon Yayınlama
-
-### Adım 1: Versiyon Numarasını Güncelle
-`src-tauri/tauri.conf.json` ve `src-tauri/Cargo.toml`:
-```json
-"version": "0.2.0"
-```
-
-### Adım 2: Git Tag Oluştur
-```bash
-git add .
-git commit -m "Release v0.2.0"
-git tag v0.2.0
+cd we-have-saas-athome
+git add latest.json
+git commit -m "Update to v0.3.0 - Image Converter Service"
 git push origin main
-git push origin v0.2.0
 ```
 
-### Adım 3: GitHub Actions Otomatik Build Yapar
-- Tag push'landığında otomatik build başlar
-- Tüm platformlar için installer oluşturulur
-- GitHub Releases'e yüklenir
-- `latest.json` otomatik oluşturulur
+### 3. Test Et
 
-## 5. Kullanıcılar Nasıl Günceller?
+1. Eski versiyonu (v0.2.4) çalıştır
+2. Header'daki güncelleme ikonuna tıkla
+3. Güncelleme bildirimini kontrol et
+4. "Güncelle ve Yeniden Başlat" butonuna tıkla
+5. Uygulama yeniden başladığında v0.3.0 olduğunu doğrula
 
-### Otomatik:
-- Uygulama her açıldığında güncelleme kontrolü yapar
-- Güncelleme varsa kullanıcıya sorar
-- Onaylarsa otomatik indirir ve kurar
+## Yeni Özellikler (v0.3.0)
 
-### Manuel:
-- Settings > Check for Updates butonu eklenebilir
+### Fotoğraf Dönüştürme
+- Rust tabanlı hızlı dönüştürme
+- 7 format desteği
+- Sürükle-bırak arayüzü
+- Dönüştürme kuyruğu
 
-## 6. Alternatif Dağıtım Yöntemleri
+### Arşiv Yönetimi
+- Tüm dönüştürülmüş fotoğrafları görüntüleme
+- Dosya silme
+- Dosya konumunu açma
+- SQLite ile kalıcı veri saklama
 
-### A. Kendi Sunucunuz
-`latest.json` dosyasını kendi sunucunuzda host edin:
+### Ayarlar
+- Özel çıktı klasörü seçimi
+- Varsayılan klasöre dönme
 
-```json
-{
-  "version": "0.2.0",
-  "notes": "Yeni özellikler eklendi",
-  "pub_date": "2024-03-14T12:00:00Z",
-  "platforms": {
-    "windows-x86_64": {
-      "signature": "...",
-      "url": "https://yourserver.com/releases/app-0.2.0-setup.exe"
-    }
-  }
-}
-```
+## Teknik Detaylar
 
-### B. Cloudflare R2 / AWS S3
-- Ücretsiz/ucuz object storage
-- CDN ile hızlı dağıtım
+### Yeni Rust Komutları
+- `convert_image`: Fotoğraf dönüştürme
+- `delete_converted_image`: Dosya silme
+- `open_file_location`: Dosya konumunu açma
+- `get_default_output_path`: Varsayılan klasör yolu
 
-## 7. Test Etme
+### Yeni Bağımlılıklar
+- `image = "0.25"`: Fotoğraf işleme
+- `uuid = "1.0"`: Benzersiz ID oluşturma
+- `chrono = "0.4"`: Zaman damgası
+- `tauri-plugin-sql`: SQLite desteği
+- `tauri-plugin-dialog`: Dosya seçici
+- `tauri-plugin-fs`: Dosya sistemi
 
-### Local Test:
-```bash
-npm run tauri build
-# Installer'ı çalıştır ve test et
-```
-
-### Güncelleme Test:
-1. v0.1.0 build'ini kur
-2. v0.2.0 release yap
-3. Uygulamayı aç, güncelleme geldiğini gör
+### Veritabanı
+- SQLite: `$APPDATA/images.db`
+- Tablo: `converted_images`
+- Alanlar: id, original_name, converted_name, formats, file_size, output_path, created_at
 
 ## Notlar
 
-- Private key'i asla paylaşmayın
-- Her release için versiyon numarasını artırın
-- Semantic versioning kullanın (0.1.0, 0.2.0, 1.0.0)
-- Breaking changes için major version artırın
+- `.sig` dosyasını GitHub'a yükleme, imza `latest.json` içinde
+- Dosya adındaki boşlukları nokta ile değiştir
+- Private key (`myapp.key`) asla commit etme
+- Build her zaman `npm run tauri build` ile yap
+- İmzalama her build sonrası gerekli
