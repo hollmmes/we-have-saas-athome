@@ -26,3 +26,6 @@ dist-ssr
 # Tauri signing keys (NEVER commit private keys!)
 *.key
 !*.key.pub
+
+# FFmpeg binaries (too large for git, download separately)
+src-tauri/ffmpeg/*.exe
