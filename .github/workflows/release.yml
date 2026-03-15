@@ -24,6 +24,25 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Download FFmpeg
+        run: |
+          # Create ffmpeg directory
+          New-Item -ItemType Directory -Force -Path "src-tauri/ffmpeg"
+          
+          # Download FFmpeg
+          Invoke-WebRequest -Uri "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile "ffmpeg.zip"
+          
+          # Extract
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg-temp"
+          
+          # Copy binaries
+          Copy-Item "ffmpeg-temp/ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe" "src-tauri/ffmpeg/ffmpeg.exe"
+          Copy-Item "ffmpeg-temp/ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe" "src-tauri/ffmpeg/ffprobe.exe"
+          
+          # Cleanup
+          Remove-Item "ffmpeg.zip"
+          Remove-Item -Recurse "ffmpeg-temp"
+
       - name: Build the app
         uses: tauri-apps/tauri-action@v0.5
         env:
