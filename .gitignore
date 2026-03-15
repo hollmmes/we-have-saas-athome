@@ -29,3 +29,5 @@ dist-ssr
 
 # FFmpeg binaries (too large for git, download separately)
 src-tauri/ffmpeg/*.exe
+src-tauri/ffmpeg.exe
+src-tauri/ffprobe.exe

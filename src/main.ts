@@ -1,7 +1,17 @@
-import { createIcons, Home, Info, CheckCircle, Download, Menu, Image, Archive, Trash2, FolderOpen, Settings, Video, Plus, Play, Film } from 'lucide';
-import { checkForUpdates } from './updater';
-import { initDatabase, saveImage, getImages, deleteImage as deleteImageFromDB, saveVideo, getVideos, deleteVideo as deleteVideoFromDB, getAllMedia } from './database';
-import { initEditor } from './editor';
+// Refactored imports - using modular structure
+import { initDatabase } from './database';
+import { initIcons } from './utils/icons';
+import { setupNavigation, setupSidebarToggle } from './utils/navigation';
+import { setupFileDrop } from './utils/file-drop';
+import { setupHomePage } from './pages/home';
+import { setupConverterPage, loadConvertedResults, handleFilePaths } from './pages/converter';
+import { setupVideoPage, addVideosToSelection, addVideosToMerge } from './pages/video';
+import { setupSeoPage } from './pages/seo';
+import { setupResizePage } from './pages/resize';
+import { setupCropPage } from './pages/crop';
+import { setupMonitorPage, loadDomains } from './pages/monitor';
+import { setupArchivePage, loadArchive } from './pages/archive';
+import { setupDatabasePage, loadDatabaseStats } from './pages/database';
 
 window.addEventListener("DOMContentLoaded", async () => {
   // Initialize database
@@ -43,17 +53,29 @@ window.addEventListener("DOMContentLoaded", async () => {
               <i data-lucide="video" class="nav-icon"></i>
               <span class="nav-text">Video Optimize</span>
             </a>
-            <a href="#" class="nav-item" data-page="editor">
-              <i data-lucide="film" class="nav-icon"></i>
-              <span class="nav-text">Video Editör</span>
+            <a href="#" class="nav-item" data-page="seo">
+              <i data-lucide="hash" class="nav-icon"></i>
+              <span class="nav-text">SEO Araçları</span>
+            </a>
+            <a href="#" class="nav-item" data-page="resize">
+              <i data-lucide="maximize" class="nav-icon"></i>
+              <span class="nav-text">Fotoğraf Boyutlandır</span>
+            </a>
+            <a href="#" class="nav-item" data-page="crop">
+              <i data-lucide="crop" class="nav-icon"></i>
+              <span class="nav-text">Fotoğraf Kırp</span>
+            </a>
+            <a href="#" class="nav-item" data-page="monitor">
+              <i data-lucide="monitor" class="nav-icon"></i>
+              <span class="nav-text">SSL & Domain Takip</span>
             </a>
             <a href="#" class="nav-item" data-page="archive">
               <i data-lucide="archive" class="nav-icon"></i>
               <span class="nav-text">Arşiv</span>
             </a>
             <a href="#" class="nav-item" data-page="settings">
-              <i data-lucide="settings" class="nav-icon"></i>
-              <span class="nav-text">Ayarlar</span>
+              <i data-lucide="database" class="nav-icon"></i>
+              <span class="nav-text">Veritabanı</span>
             </a>
           </nav>
           <div class="sidebar-footer">
@@ -70,25 +92,53 @@ window.addEventListener("DOMContentLoaded", async () => {
           <div class="page-content active" id="homePage">
             <div class="content-wrapper">
               <h2>We Have SaaS at Home</h2>
-              <p>Modern ve güçlü bir masaüstü uygulama deneyimi. Otomatik güncelleme sistemi ile her zaman en son özelliklere sahip olun.</p>
+              <p>Hoş geldiniz! Başlamak için önce çıktı klasörünüzü ayarlayın.</p>
               
-              <div class="version-section">
-                <div class="version-header">
-                  <h3>Sürüm Bilgisi</h3>
-                  <span class="version-badge">v0.4.0</span>
+              <div class="setup-section">
+                <div class="setup-card" id="setupCard">
+                  <div class="setup-icon">
+                    <i data-lucide="folder-open" class="setup-icon-svg"></i>
+                  </div>
+                  <h3>Çıktı Klasörü Ayarla</h3>
+                  <p class="setup-description">Tüm dönüştürülmüş dosyalarınız bu klasörde saklanacak. Her araç için otomatik alt klasörler oluşturulacak.</p>
+                  
+                  <div class="current-folder" id="currentFolder">
+                    <span class="folder-label">Seçili Klasör:</span>
+                    <span class="folder-path" id="folderPath">Henüz seçilmedi</span>
+                  </div>
+                  
+                  <button class="btn-primary btn-large" id="selectFolderBtn">
+                    <i data-lucide="folder-open"></i>
+                    <span>Klasör Seç</span>
+                  </button>
+                  
+                  <div class="folder-structure" id="folderStructure" style="display: none;">
+                    <h4>Oluşturulacak Alt Klasörler:</h4>
+                    <ul>
+                      <li><i data-lucide="folder"></i> converted_images (Dönüştürülmüş fotoğraflar)</li>
+                      <li><i data-lucide="folder"></i> converted_videos (Optimize edilmiş videolar)</li>
+                      <li><i data-lucide="folder"></i> cropped_images (Kırpılmış fotoğraflar)</li>
+                      <li><i data-lucide="folder"></i> resized_images (Boyutlandırılmış fotoğraflar)</li>
+                    </ul>
+                  </div>
                 </div>
-                <div class="release-notes">
-                  <h4>Sürüm Notları</h4>
-                  <ul>
-                    <li>🎬 Video Editör eklendi (Timeline tabanlı düzenleme)</li>
-                    <li>✂️ Video kesme (trim) özelliği</li>
-                    <li>🎞️ Videoları birleştirme</li>
-                    <li>📹 Video thumbnail önizleme</li>
-                    <li>🎨 Drag & drop ile timeline düzenleme</li>
-                    <li>⚙️ 5 kalite seviyesi (Ultra, Yüksek, Orta, Düşük, Çok Düşük)</li>
-                    <li>🎥 Built-in video player</li>
-                    <li>📊 Video süre gösterimi</li>
-                  </ul>
+
+                <div class="version-section">
+                  <div class="version-header">
+                    <h3>Sürüm Bilgisi</h3>
+                    <span class="version-badge">v0.4.0</span>
+                  </div>
+                  <div class="release-notes">
+                    <h4>Yeni Özellikler</h4>
+                    <ul>
+                      <li>🖼️ Profesyonel fotoğraf kırpma editörü</li>
+                      <li>📱 Instagram, Facebook, YouTube şablonları</li>
+                      <li>🔒 SSL & Domain takip sistemi</li>
+                      <li>📹 Video thumbnail önizleme</li>
+                      <li>⚙️ 5 kalite seviyesi</li>
+                      <li>🎥 Built-in video player</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -170,80 +220,96 @@ window.addEventListener("DOMContentLoaded", async () => {
             </div>
           </div>
 
-          <!-- Video Editor Page -->
-          <div class="page-content" id="editorPage">
-            <div class="editor-layout">
-              <!-- Left Panel: Media Library -->
-              <div class="editor-sidebar">
-                <div class="editor-sidebar-header">
-                  <h3>Medya Kütüphanesi</h3>
-                  <button class="btn-icon" id="importMediaBtn" title="Medya İçe Aktar">
-                    <i data-lucide="plus"></i>
-                  </button>
-                </div>
-                <div class="media-library" id="mediaLibrary">
-                  <p class="empty-message">Medya eklemek için + butonuna tıklayın</p>
-                </div>
-              </div>
-
-              <!-- Center: Preview & Timeline -->
-              <div class="editor-main">
-                <!-- Preview Area -->
-                <div class="editor-preview">
-                  <div class="preview-container">
-                    <video id="editorPreview" controls>
-                      <source src="" type="video/mp4">
-                    </video>
-                    <div class="preview-placeholder" id="previewPlaceholder">
-                      <i data-lucide="film"></i>
-                      <p>Timeline'a video ekleyin</p>
-                    </div>
-                  </div>
-                  <div class="preview-controls">
-                    <button class="control-btn" id="playPauseBtn">
-                      <i data-lucide="play"></i>
-                    </button>
-                    <div class="time-display">
-                      <span id="currentTime">00:00</span> / <span id="totalTime">00:00</span>
-                    </div>
-                    <input type="range" class="timeline-scrubber" id="timelineScrubber" min="0" max="100" value="0">
+          <!-- SEO Tools Page -->
+          <div class="page-content" id="seoPage">
+            <div class="content-wrapper">
+              <h2>SEO Araçları</h2>
+              <p>Anahtar kelimelerden etiket, slug ve hashtag oluşturun</p>
+              
+              <div class="seo-container">
+                <div class="seo-input-section">
+                  <h3>SEO Anahtar Kelimeleri Girin</h3>
+                  <p class="seo-hint"><strong>(her satır ayrı metin)</strong><br>örnek: dijital pazarlama<br>sosyal medya<br>içerik stratejisi</p>
+                  <textarea id="seoInputText" class="seo-textarea" placeholder="Her satıra bir anahtar kelime yazın..."></textarea>
+                  
+                  <div class="seo-options">
+                    <label>SLUG için MAX karakter:</label>
+                    <input type="number" id="seoMaxLen" value="150" class="seo-number-input">
+                    <button class="btn-primary" id="seoConvertBtn">Dönüştür</button>
                   </div>
                 </div>
-
-                <!-- Timeline Area -->
-                <div class="editor-timeline">
-                  <div class="timeline-header">
-                    <h3>Timeline</h3>
-                    <div class="timeline-tools">
-                      <button class="btn-secondary btn-sm" id="clearTimelineBtn">Temizle</button>
-                      <button class="btn-primary btn-sm" id="exportVideoBtn">Dışa Aktar</button>
+                
+                <div class="seo-results">
+                  <div class="seo-result-item">
+                    <div class="seo-result-header">
+                      <h3>Blog Hashtag</h3>
+                      <span class="seo-format">key, key, key</span>
                     </div>
+                    <textarea id="seoJoinedResult" class="seo-result-textarea" readonly></textarea>
+                    <button class="btn-secondary btn-sm" onclick="copyToClipboard('seoJoinedResult')">Kopyala</button>
                   </div>
-                  <div class="timeline-tracks">
-                    <div class="timeline-track" id="videoTrack" data-track="video">
-                      <div class="track-label">Video</div>
-                      <div class="track-content" id="videoTrackContent">
-                        <p class="track-empty">Videoları buraya sürükleyin</p>
-                      </div>
+                  
+                  <div class="seo-result-item">
+                    <div class="seo-result-header">
+                      <h3>SLUG (URL)</h3>
+                      <span class="seo-format">key-key-key</span>
                     </div>
-                    <div class="timeline-track" id="audioTrack" data-track="audio">
-                      <div class="track-label">Ses</div>
-                      <div class="track-content" id="audioTrackContent">
-                        <p class="track-empty">Ses dosyalarını buraya sürükleyin</p>
-                      </div>
+                    <textarea id="seoUrlResult" class="seo-result-textarea" readonly></textarea>
+                    <button class="btn-secondary btn-sm" onclick="copyToClipboard('seoUrlResult')">Kopyala</button>
+                  </div>
+                  
+                  <div class="seo-result-item">
+                    <div class="seo-result-header">
+                      <h3>Sosyal Medya Hashtag</h3>
+                      <span class="seo-format">#key #key #key</span>
                     </div>
+                    <textarea id="seoHashtagResult" class="seo-result-textarea" readonly></textarea>
+                    <button class="btn-secondary btn-sm" onclick="copyToClipboard('seoHashtagResult')">Kopyala</button>
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
 
-              <!-- Right Panel: Properties -->
-              <div class="editor-properties">
-                <div class="properties-header">
-                  <h3>Özellikler</h3>
+          <!-- Photo Resize Page -->
+          <div class="page-content" id="resizePage">
+            <div class="content-wrapper">
+              <h2>Fotoğraf Boyutlandırıcı</h2>
+              <p>Fotoğraflarınızı istediğiniz boyuta getirin</p>
+              
+              <div class="resize-container">
+                <!-- Üst Kontrol Paneli -->
+                <div class="resize-controls">
+                  <div class="resize-dimensions">
+                    <div class="dimension-input">
+                      <label>Genişlik:</label>
+                      <input type="number" id="resizeWidth" value="350" class="dimension-number">
+                    </div>
+                    <div class="dimension-input">
+                      <label>Yükseklik:</label>
+                      <input type="number" id="resizeHeight" value="390" class="dimension-number">
+                    </div>
+                    <button class="btn-secondary" id="saveDimensionBtn">Ölçü Kaydet</button>
+                  </div>
+                  <div class="resize-actions">
+                    <button class="btn-primary" id="downloadAllBtn" disabled>Hepsini İndir</button>
+                    <button class="btn-danger" id="clearResizeBtn" disabled>Temizle</button>
+                  </div>
                 </div>
-                <div class="properties-content" id="propertiesContent">
-                  <p class="empty-message">Bir clip seçin</p>
+
+                <!-- Kaydedilmiş Ölçüler (Rozetler) -->
+                <div class="resize-badges" id="resizeBadges"></div>
+
+                <!-- Sürükle Bırak Alanı -->
+                <div class="resize-drop-zone" id="resizeDropZone">
+                  <i data-lucide="maximize" class="drop-icon"></i>
+                  <h3>Fotoğrafları Sürükle & Bırak</h3>
+                  <p>veya tıklayarak dosya seçin</p>
+                  <input type="file" id="resizeFileInput" accept="image/*" multiple hidden>
                 </div>
+
+                <!-- Önizleme Galerisi -->
+                <div class="resize-gallery" id="resizeGallery"></div>
               </div>
             </div>
           </div>
@@ -269,20 +335,254 @@ window.addEventListener("DOMContentLoaded", async () => {
             </div>
           </div>
 
+          <!-- Photo Crop Page -->
+          <div class="page-content" id="cropPage">
+            <div class="content-wrapper">
+              <h2>Fotoğraf Kırpma Editörü</h2>
+              <p>Fotoğraflarınızı profesyonel şablonlarla kırpın ve düzenleyin</p>
+              
+              <div class="crop-container">
+                <!-- Template Selection -->
+                <div class="crop-templates">
+                  <h3>Hazır Şablonlar</h3>
+                  <div class="template-grid">
+                    <button class="template-btn active" data-ratio="free" data-width="0" data-height="0">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 1/1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"></div>
+                      </div>
+                      <span>Serbest</span>
+                    </button>
+                    <button class="template-btn" data-ratio="1:1" data-width="1080" data-height="1080">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 1/1; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);"></div>
+                      </div>
+                      <span>Instagram Post</span>
+                      <small>1080×1080</small>
+                    </button>
+                    <button class="template-btn" data-ratio="4:5" data-width="1080" data-height="1350">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 4/5; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);"></div>
+                      </div>
+                      <span>Instagram Portrait</span>
+                      <small>1080×1350</small>
+                    </button>
+                    <button class="template-btn" data-ratio="9:16" data-width="1080" data-height="1920">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 9/16; background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);"></div>
+                      </div>
+                      <span>Instagram Story</span>
+                      <small>1080×1920</small>
+                    </button>
+                    <button class="template-btn" data-ratio="16:9" data-width="1920" data-height="1080">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 16/9; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);"></div>
+                      </div>
+                      <span>YouTube Thumbnail</span>
+                      <small>1920×1080</small>
+                    </button>
+                    <button class="template-btn" data-ratio="1.91:1" data-width="1200" data-height="628">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 1.91/1; background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);"></div>
+                      </div>
+                      <span>Facebook Post</span>
+                      <small>1200×628</small>
+                    </button>
+                    <button class="template-btn" data-ratio="16:9" data-width="1200" data-height="675">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 16/9; background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);"></div>
+                      </div>
+                      <span>Facebook Cover</span>
+                      <small>1200×675</small>
+                    </button>
+                    <button class="template-btn" data-ratio="2:1" data-width="1500" data-height="500">
+                      <div class="template-icon">
+                        <div class="template-preview" style="aspect-ratio: 2/1; background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);"></div>
+                      </div>
+                      <span>Twitter Header</span>
+                      <small>1500×500</small>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Editor Area -->
+                <div class="crop-editor">
+                  <div class="crop-upload-area" id="cropUploadArea">
+                    <i data-lucide="crop" class="crop-upload-icon"></i>
+                    <h3>Fotoğraf Yükle</h3>
+                    <p>Kırpmak istediğiniz fotoğrafı sürükleyin veya tıklayın</p>
+                    <input type="file" id="cropFileInput" accept="image/*" hidden>
+                  </div>
+
+                  <div class="crop-canvas-wrapper" id="cropCanvasWrapper" style="display: none;">
+                    <div class="crop-canvas-container">
+                      <canvas id="cropCanvas"></canvas>
+                      <div class="crop-overlay" id="cropOverlay">
+                        <div class="crop-box" id="cropBox">
+                          <div class="crop-handle nw"></div>
+                          <div class="crop-handle ne"></div>
+                          <div class="crop-handle sw"></div>
+                          <div class="crop-handle se"></div>
+                          <div class="crop-handle n"></div>
+                          <div class="crop-handle s"></div>
+                          <div class="crop-handle w"></div>
+                          <div class="crop-handle e"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="crop-controls">
+                      <div class="crop-info">
+                        <span id="cropDimensions">0 × 0</span>
+                        <span id="cropRatio">Serbest</span>
+                      </div>
+                      <div class="crop-actions">
+                        <button class="btn-secondary" id="cropResetBtn">Sıfırla</button>
+                        <button class="btn-secondary" id="cropRotateBtn">90° Döndür</button>
+                        <button class="btn-primary" id="cropSaveBtn">Kırp ve İndir</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SSL & Domain Monitor Page -->
+          <div class="page-content" id="monitorPage">
+            <div class="content-wrapper">
+              <h2>SSL & Domain Takip</h2>
+              <p>Domain'lerinizin SSL sertifikalarını ve süre bilgilerini takip edin</p>
+              
+              <div class="monitor-container">
+                <div class="monitor-add-section">
+                  <h3>Yeni Domain Ekle</h3>
+                  <div class="monitor-input-group">
+                    <input type="text" id="domainInput" class="monitor-input" placeholder="example.com" />
+                    <button class="btn-primary" id="addDomainBtn">Ekle ve Sorgula</button>
+                  </div>
+                  <button class="btn-secondary" id="refreshAllDomainsBtn" style="margin-top: 10px; width: 100%;">Tümünü Güncelle</button>
+                </div>
+                
+                <div class="monitor-list">
+                  <h3>Domain Listesi</h3>
+                  <div class="monitor-table-wrapper">
+                    <table class="monitor-table">
+                      <thead>
+                        <tr>
+                          <th>Domain</th>
+                          <th>SSL Başlangıç</th>
+                          <th>SSL Bitiş</th>
+                          <th>SSL Kalan</th>
+                          <th>SSL Durum</th>
+                          <th>Domain Durum</th>
+                          <th>Domain Başlangıç</th>
+                          <th>Domain Bitiş</th>
+                          <th>Domain Kalan</th>
+                          <th>Yayıncı</th>
+                          <th>İşlem</th>
+                        </tr>
+                      </thead>
+                      <tbody id="domainTableBody">
+                        <tr>
+                          <td colspan="11" class="empty-message">Henüz domain eklenmedi.</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Settings Page -->
           <div class="page-content" id="settingsPage">
             <div class="content-wrapper">
-              <h2>Ayarlar</h2>
-              <p>Uygulama ayarlarını yapılandırın</p>
+              <h2>Veritabanı Takibi</h2>
+              <p>Uygulama veritabanı istatistikleri ve yönetimi</p>
               
-              <div class="settings-container">
-                <div class="setting-item">
-                  <div class="setting-info">
-                    <h3>Çıktı Klasörü</h3>
-                    <p class="setting-description">Dönüştürülen fotoğrafların kaydedileceği klasör</p>
-                    <p class="current-path" id="currentOutputPath">Yükleniyor...</p>
+              <div class="database-container">
+                <div class="db-stats-grid">
+                  <div class="db-stat-card">
+                    <div class="db-stat-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                      <i data-lucide="image"></i>
+                    </div>
+                    <div class="db-stat-info">
+                      <h3 id="dbImageCount">0</h3>
+                      <p>Dönüştürülmüş Fotoğraf</p>
+                    </div>
                   </div>
-                  <button class="btn-primary" id="selectOutputFolder">Klasör Seç</button>
+
+                  <div class="db-stat-card">
+                    <div class="db-stat-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                      <i data-lucide="video"></i>
+                    </div>
+                    <div class="db-stat-info">
+                      <h3 id="dbVideoCount">0</h3>
+                      <p>Optimize Edilmiş Video</p>
+                    </div>
+                  </div>
+
+                  <div class="db-stat-card">
+                    <div class="db-stat-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+                      <i data-lucide="monitor"></i>
+                    </div>
+                    <div class="db-stat-info">
+                      <h3 id="dbDomainCount">0</h3>
+                      <p>Takip Edilen Domain</p>
+                    </div>
+                  </div>
+
+                  <div class="db-stat-card">
+                    <div class="db-stat-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                      <i data-lucide="hard-drive"></i>
+                    </div>
+                    <div class="db-stat-info">
+                      <h3 id="dbSize">0 KB</h3>
+                      <p>Veritabanı Boyutu</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="db-tables">
+                  <h3>Tablo Detayları</h3>
+                  <div class="db-table-list">
+                    <div class="db-table-item">
+                      <div class="db-table-header">
+                        <i data-lucide="table"></i>
+                        <span>converted_images</span>
+                      </div>
+                      <div class="db-table-stats">
+                        <span id="tableImageCount">0 kayıt</span>
+                      </div>
+                    </div>
+
+                    <div class="db-table-item">
+                      <div class="db-table-header">
+                        <i data-lucide="table"></i>
+                        <span>converted_videos</span>
+                      </div>
+                      <div class="db-table-stats">
+                        <span id="tableVideoCount">0 kayıt</span>
+                      </div>
+                    </div>
+
+                    <div class="db-table-item">
+                      <div class="db-table-header">
+                        <i data-lucide="table"></i>
+                        <span>domains</span>
+                      </div>
+                      <div class="db-table-stats">
+                        <span id="tableDomainCount">0 kayıt</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="db-actions">
+                  <button class="btn-secondary" id="refreshDbStatsBtn">
+                    <i data-lucide="refresh-cw"></i>
+                    <span>İstatistikleri Yenile</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -291,1099 +591,90 @@ window.addEventListener("DOMContentLoaded", async () => {
       </div>
     `;
 
-    // Initialize Lucide icons
-    const allIcons = {
-      Home,
-      Info,
-      CheckCircle,
-      Download,
-      Menu,
-      Image,
-      Archive,
-      Trash2,
-      FolderOpen,
-      Settings,
-      Video,
-      Plus,
-      Play,
-      Film
-    };
-    
-    // Make createIcons global for editor
-    (window as any).createIcons = () => {
-      createIcons({
-        icons: allIcons,
-        attrs: {
-          width: '20',
-          height: '20',
-          'stroke-width': '2'
-        }
-      });
-    };
-    
-    (window as any).createIcons();
 
-    // Settings
-    const selectOutputFolderBtn = document.getElementById('selectOutputFolder');
-    const currentOutputPathEl = document.getElementById('currentOutputPath');
 
-    async function loadSettings() {
-      const savedPath = localStorage.getItem('outputPath');
-      if (savedPath) {
-        currentOutputPathEl!.textContent = savedPath;
-      } else {
-        // Get default path
-        const { invoke } = await import('@tauri-apps/api/core');
-        try {
-          const defaultPath = await invoke('get_default_output_path') as string;
-          currentOutputPathEl!.textContent = defaultPath;
-        } catch (error) {
-          currentOutputPathEl!.textContent = 'Varsayılan klasör';
-        }
-      }
-    }
+    // Initialize icons
+    initIcons();
 
-    selectOutputFolderBtn?.addEventListener('click', async () => {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: 'Çıktı Klasörünü Seçin'
-      });
-      
-      if (selected && typeof selected === 'string') {
-        localStorage.setItem('outputPath', selected);
-        currentOutputPathEl!.textContent = selected;
-        alert('Çıktı klasörü güncellendi!');
-      }
-    });
+    // Setup update checker
+    setupUpdateChecker();
 
-    loadSettings();
+    // Setup navigation with page loaders
+    setupNavigation(
+      loadArchive,
+      loadConvertedResults,
+      loadDatabaseStats,
+      loadDomains
+    );
 
-    // Güncelleme durumu kontrolü
-    const updateStatusBtn = document.getElementById("updateStatusBtn");
-    const updateText = updateStatusBtn?.querySelector('.update-text');
-    
-    async function checkUpdateStatus() {
-      try {
-        const { check } = await import('@tauri-apps/plugin-updater');
-        const update = await check();
-        
-        if (update?.available && updateStatusBtn && updateText) {
-          // Güncelleme mevcut
-          updateStatusBtn.classList.add('update-available');
-          updateText.textContent = `Güncelleme mevcut: ${update.version}`;
-          const icon = updateStatusBtn.querySelector('i');
-          if (icon) {
-            icon.setAttribute('data-lucide', 'download');
-            createIcons();
-          }
-        }
-      } catch (error) {
-        console.error('Güncelleme kontrolü hatası:', error);
-      }
-    }
+    // Setup sidebar toggle
+    setupSidebarToggle();
 
-    // Sayfa yüklendiğinde güncelleme kontrolü yap
-    checkUpdateStatus();
+    // Setup all page modules
+    setupHomePage();
+    setupConverterPage();
+    setupVideoPage();
+    setupSeoPage();
+    setupResizePage();
+    setupCropPage();
+    setupMonitorPage();
+    setupArchivePage();
+    setupDatabasePage();
 
-    // Güncelleme butonuna tıklandığında
-    updateStatusBtn?.addEventListener("click", () => {
-      checkForUpdates();
-    });
-
-    // Page Navigation
-    const navItems = document.querySelectorAll('.nav-item');
-    const pages = document.querySelectorAll('.page-content');
-    
-    navItems.forEach(item => {
-      item.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const pageName = (item as HTMLElement).dataset.page;
-        
-        // Update active nav item
-        navItems.forEach(nav => nav.classList.remove('active'));
-        item.classList.add('active');
-        
-        // Show selected page
-        pages.forEach(page => page.classList.remove('active'));
-        const targetPage = document.getElementById(`${pageName}Page`);
-        if (targetPage) {
-          targetPage.classList.add('active');
-          
-          // Refresh archive when opening archive page
-          if (pageName === 'archive') {
-            await loadArchive();
-          }
-          
-          // Load converted results when opening converter page
-          if (pageName === 'converter') {
-            await loadConvertedResults();
-          }
-          
-          // Load settings when opening settings page
-          if (pageName === 'settings') {
-            await loadSettings();
-          }
-          
-          // Initialize editor when opening editor page
-          if (pageName === 'editor') {
-            initEditor();
-          }
-        }
-        
-        // Reinitialize icons
-        createIcons({
-          icons: allIcons
-        });
-        
-        // Close sidebar on mobile
-        if (window.innerWidth < 768) {
-          sidebar?.classList.remove('open');
-        }
-      });
-    });
-
-    // Image Converter Logic
-    const dropZone = document.getElementById('dropZone');
-    const selectedFilesContainer = document.getElementById('selectedFiles');
-    const conversionQueue = document.getElementById('conversionQueue');
-    let selectedFiles: string[] = [];
-
-    // Click to select files using Tauri dialog
-    dropZone?.addEventListener('click', async () => {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      
-      const selected = await open({
-        multiple: true,
-        filters: [{
-          name: 'Images',
-          extensions: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff', 'tif', 'ico']
-        }]
-      });
-      
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        addFilesToSelection(paths);
-      }
-    });
-
-    // Tauri file drop event
-    async function setupFileDrop() {
-      const { listen } = await import('@tauri-apps/api/event');
-      
-      await listen('tauri://drag-over', () => {
-        // Check which page is active
+    // Setup file drop handling
+    await setupFileDrop(
+      handleFilePaths,
+      async (paths: string[]) => {
         const activePage = document.querySelector('.page-content.active');
-        const activePageId = activePage?.id;
-        
-        if (activePageId === 'converterPage') {
-          dropZone?.classList.add('drag-over');
-        } else if (activePageId === 'videoPage') {
+        if (activePage?.id === 'videoPage') {
           const activeTab = document.querySelector('.tab-content.active');
           if (activeTab?.id === 'optimizeTab') {
-            videoDropZone?.classList.add('drag-over');
+            addVideosToSelection(paths);
           } else if (activeTab?.id === 'mergeTab') {
-            mergeDropZone?.classList.add('drag-over');
+            addVideosToMerge(paths);
           }
         }
-      });
-
-      await listen('tauri://drag-drop', async (event: any) => {
-        dropZone?.classList.remove('drag-over');
-        videoDropZone?.classList.remove('drag-over');
-        mergeDropZone?.classList.remove('drag-over');
-        
-        const paths = event.payload.paths as string[];
-        if (paths && paths.length > 0) {
-          // Check which page is active
-          const activePage = document.querySelector('.page-content.active');
-          const activePageId = activePage?.id;
-          
-          if (activePageId === 'converterPage') {
-            // Image converter page
-            await handleFilePaths(paths);
-          } else if (activePageId === 'videoPage') {
-            // Video page
-            const activeTab = document.querySelector('.tab-content.active');
-            if (activeTab?.id === 'optimizeTab') {
-              addVideosToSelection(paths);
-            } else if (activeTab?.id === 'mergeTab') {
-              addVideosToMerge(paths);
-            }
-          }
-        }
-      });
-
-      await listen('tauri://drag-leave', () => {
-        dropZone?.classList.remove('drag-over');
-        videoDropZone?.classList.remove('drag-over');
-        mergeDropZone?.classList.remove('drag-over');
-      });
-    }
-
-    setupFileDrop();
-
-    async function handleFilePaths(paths: string[]) {
-      // Filter only image files
-      const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff', 'tif', 'ico'];
-      const imagePaths = paths.filter(path => {
-        const ext = path.split('.').pop()?.toLowerCase();
-        return ext && imageExtensions.includes(ext);
-      });
-      
-      if (imagePaths.length > 0) {
-        addFilesToSelection(imagePaths);
       }
-    }
-
-    function addFilesToSelection(paths: string[]) {
-      selectedFiles = [...selectedFiles, ...paths];
-      renderSelectedFiles();
-    }
-
-    function renderSelectedFiles() {
-      if (!selectedFilesContainer) return;
-      
-      if (selectedFiles.length === 0) {
-        selectedFilesContainer.innerHTML = '';
-        selectedFilesContainer.style.display = 'none';
-        return;
-      }
-
-      selectedFilesContainer.style.display = 'block';
-      selectedFilesContainer.innerHTML = `
-        <div class="selected-files-header">
-          <h3>Seçilen Fotoğraflar (${selectedFiles.length})</h3>
-          <button class="btn-secondary" onclick="clearSelectedFiles()">Temizle</button>
-        </div>
-        <div class="selected-files-list">
-          ${selectedFiles.map((path, index) => {
-            const fileName = path.split(/[\\/]/).pop() || 'unknown';
-            return `
-              <div class="selected-file-item" data-index="${index}">
-                <div class="file-item-info">
-                  <i data-lucide="image"></i>
-                  <span class="file-name">${fileName}</span>
-                </div>
-                <div class="file-item-controls">
-                  <select class="format-select" data-index="${index}">
-                    <option value="png">PNG</option>
-                    <option value="jpg">JPG</option>
-                    <option value="webp" selected>WebP</option>
-                    <option value="gif">GIF</option>
-                    <option value="bmp">BMP</option>
-                    <option value="ico">ICO</option>
-                    <option value="tiff">TIFF</option>
-                  </select>
-                  <div class="quality-control" data-index="${index}">
-                    <label>Kalite: <span class="quality-value">85</span>%</label>
-                    <input type="range" class="quality-slider" min="1" max="100" value="85" data-index="${index}">
-                  </div>
-                  <button class="btn-icon" onclick="removeFile(${index})" title="Kaldır">
-                    <i data-lucide="trash-2"></i>
-                  </button>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <div class="selected-files-actions">
-          <button class="btn-primary btn-large" onclick="convertAllFiles()">Tümünü Dönüştür</button>
-        </div>
-      `;
-
-      // Add event listeners for quality sliders
-      const sliders = selectedFilesContainer.querySelectorAll('.quality-slider');
-      sliders.forEach(slider => {
-        slider.addEventListener('input', (e) => {
-          const target = e.target as HTMLInputElement;
-          const value = target.value;
-          const valueSpan = target.parentElement?.querySelector('.quality-value');
-          if (valueSpan) {
-            valueSpan.textContent = value;
-          }
-        });
-      });
-
-      createIcons({
-        icons: allIcons
-      });
-    }
-
-    (window as any).clearSelectedFiles = () => {
-      selectedFiles = [];
-      renderSelectedFiles();
-    };
-
-    (window as any).removeFile = (index: number) => {
-      selectedFiles.splice(index, 1);
-      renderSelectedFiles();
-    };
-
-    (window as any).convertAllFiles = async () => {
-      if (!selectedFilesContainer) return;
-
-      const fileItems = selectedFilesContainer.querySelectorAll('.selected-file-item');
-      
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const filePath = selectedFiles[i];
-        const fileItem = fileItems[i];
-        
-        const formatSelect = fileItem.querySelector('.format-select') as HTMLSelectElement;
-        const qualitySlider = fileItem.querySelector('.quality-slider') as HTMLInputElement;
-        
-        const format = formatSelect?.value || 'webp';
-        const quality = parseInt(qualitySlider?.value || '85');
-        
-        await convertFile(filePath, format, quality);
-      }
-
-      // Clear selection after conversion
-      selectedFiles = [];
-      renderSelectedFiles();
-    };
-
-    async function convertFile(filePath: string, format: string, quality: number) {
-      const { invoke } = await import('@tauri-apps/api/core');
-      
-      // Get filename from path
-      const fileName = filePath.split(/[\\/]/).pop() || 'unknown';
-      
-      // Get output directory from settings
-      const outputDir = localStorage.getItem('outputPath') || null;
-      
-      // Create queue item
-      const queueItem = document.createElement('div');
-      queueItem.className = 'queue-item';
-      queueItem.innerHTML = `
-        <div class="queue-item-info">
-          <span class="queue-item-name">${fileName}</span>
-          <span class="queue-item-status">Dönüştürülüyor... (${format.toUpperCase()}, Kalite: ${quality}%)</span>
-        </div>
-        <div class="queue-item-progress">
-          <div class="progress-bar"></div>
-        </div>
-      `;
-      conversionQueue?.appendChild(queueItem);
-
-      try {
-        // Convert image
-        const result: any = await invoke('convert_image', {
-          filePath: filePath,
-          outputFormat: format,
-          outputDir: outputDir,
-          quality: quality
-        });
-
-        // Save to database
-        await saveImage(result);
-
-        // Update queue item
-        queueItem.querySelector('.queue-item-status')!.textContent = 'Tamamlandı!';
-        queueItem.classList.add('success');
-        
-        // Add to results grid
-        await loadConvertedResults();
-        
-        setTimeout(() => {
-          queueItem.remove();
-        }, 3000);
-
-      } catch (error) {
-        console.error('Conversion error:', error);
-        queueItem.querySelector('.queue-item-status')!.textContent = `Hata: ${error}`;
-        queueItem.classList.add('error');
-      }
-    }
-
-    async function loadConvertedResults() {
-      const resultsGrid = document.getElementById('resultsGrid');
-      if (!resultsGrid) return;
-
-      try {
-        const images = await getImages();
-        
-        if (images.length === 0) {
-          resultsGrid.innerHTML = '<p class="empty-message">Henüz dönüştürülmüş fotoğraf yok</p>';
-          return;
-        }
-
-        // Show last 6 images
-        const recentImages = images.slice(0, 6);
-        
-        // Import invoke for getting image data
-        const { invoke } = await import('@tauri-apps/api/core');
-        
-        // Load images with data URLs
-        const imagePromises = recentImages.map(async (img) => {
-          try {
-            const dataUrl = await invoke('get_image_data_url', { filePath: img.output_path }) as string;
-            return { ...img, dataUrl };
-          } catch (error) {
-            console.error('Failed to load image:', img.output_path, error);
-            return { ...img, dataUrl: '' };
-          }
-        });
-        
-        const imagesWithData = await Promise.all(imagePromises);
-        
-        resultsGrid.innerHTML = imagesWithData.map(img => {
-          // Escape backslashes for HTML
-          const escapedPath = img.output_path.replace(/\\/g, '\\\\');
-          return `
-          <div class="result-card">
-            ${img.dataUrl ? `
-            <div class="result-preview">
-              <img src="${img.dataUrl}" alt="${img.converted_name}" />
-            </div>
-            ` : ''}
-            <div class="result-card-header">
-              <span class="result-format">${img.converted_format}</span>
-              <span class="result-size">${formatFileSize(img.file_size)}</span>
-            </div>
-            <div class="result-card-body">
-              <h4>${img.converted_name}</h4>
-              <p class="result-meta">${img.created_at}</p>
-            </div>
-            <div class="result-card-actions">
-              <button class="action-btn" onclick='openFileLocation(\`${escapedPath}\`)' title="Dosya Konumunu Aç">
-                <i data-lucide="folder-open"></i>
-              </button>
-            </div>
-          </div>
-        `;
-        }).join('');
-
-        createIcons({
-          icons: allIcons
-        });
-      } catch (error) {
-        console.error('Load results error:', error);
-      }
-    }
-
-    // Video Optimizer Logic
-    const videoDropZone = document.getElementById('videoDropZone');
-    const mergeDropZone = document.getElementById('mergeDropZone');
-    const selectedVideosContainer = document.getElementById('selectedVideos');
-    const mergeListContainer = document.getElementById('mergeList');
-    const videoQueue = document.getElementById('videoQueue');
-    const mergeQueue = document.getElementById('mergeQueue');
-    const mergeActions = document.getElementById('mergeActions');
-    const mergeVideosBtn = document.getElementById('mergeVideosBtn');
-    
-    let selectedVideos: string[] = [];
-    let mergeVideos: string[] = [];
-    
-    // Tab switching
-    const tabBtns = document.querySelectorAll('.tab-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    tabBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const tab = (btn as HTMLElement).dataset.tab;
-        
-        tabBtns.forEach(b => b.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-        
-        btn.classList.add('active');
-        document.getElementById(`${tab}Tab`)?.classList.add('active');
-      });
-    });
-    
-    // Video file selection for optimize
-    videoDropZone?.addEventListener('click', async () => {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      
-      const selected = await open({
-        multiple: true,
-        filters: [{
-          name: 'Videos',
-          extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv']
-        }]
-      });
-      
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        addVideosToSelection(paths);
-      }
-    });
-    
-    // Video file selection for merge
-    mergeDropZone?.addEventListener('click', async () => {
-      const { open } = await import('@tauri-apps/plugin-dialog');
-      
-      const selected = await open({
-        multiple: true,
-        filters: [{
-          name: 'Videos',
-          extensions: ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv']
-        }]
-      });
-      
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        addVideosToMerge(paths);
-      }
-    });
-    
-    function addVideosToSelection(paths: string[]) {
-      selectedVideos = [...selectedVideos, ...paths];
-      renderSelectedVideos();
-    }
-    
-    function addVideosToMerge(paths: string[]) {
-      mergeVideos = [...mergeVideos, ...paths];
-      renderMergeList();
-    }
-    
-    function renderSelectedVideos() {
-      if (!selectedVideosContainer) return;
-      
-      if (selectedVideos.length === 0) {
-        selectedVideosContainer.innerHTML = '';
-        selectedVideosContainer.style.display = 'none';
-        return;
-      }
-      
-      selectedVideosContainer.style.display = 'block';
-      selectedVideosContainer.innerHTML = `
-        <div class="selected-files-header">
-          <h3>Seçilen Videolar (${selectedVideos.length})</h3>
-          <button class="btn-secondary" onclick="clearSelectedVideos()">Temizle</button>
-        </div>
-        <div class="selected-files-list">
-          ${selectedVideos.map((path, index) => {
-            const fileName = path.split(/[\\/]/).pop() || 'unknown';
-            return `
-              <div class="selected-file-item" data-index="${index}">
-                <div class="file-item-info">
-                  <i data-lucide="video"></i>
-                  <span class="file-name">${fileName}</span>
-                </div>
-                <div class="file-item-controls">
-                  <select class="format-select" data-index="${index}">
-                    <option value="ultra">Ultra Kalite (CRF 15 - En İyi)</option>
-                    <option value="high">Yüksek Kalite (CRF 18)</option>
-                    <option value="medium" selected>Orta Kalite (CRF 23 - Önerilen)</option>
-                    <option value="low">Düşük Kalite (CRF 28)</option>
-                    <option value="verylow">Çok Düşük (CRF 32 - En Küçük)</option>
-                  </select>
-                  <button class="btn-icon" onclick="removeVideo(${index})" title="Kaldır">
-                    <i data-lucide="trash-2"></i>
-                  </button>
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-        <div class="selected-files-actions">
-          <button class="btn-primary btn-large" onclick="optimizeAllVideos()">Tümünü Optimize Et</button>
-        </div>
-      `;
-      
-      createIcons({ icons: allIcons });
-    }
-    
-    function renderMergeList() {
-      if (!mergeListContainer) return;
-      
-      if (mergeVideos.length === 0) {
-        mergeListContainer.innerHTML = '';
-        mergeActions!.style.display = 'none';
-        return;
-      }
-      
-      mergeActions!.style.display = 'flex';
-      mergeListContainer.innerHTML = `
-        <div class="merge-list-header">
-          <h3>Birleştirilecek Videolar (${mergeVideos.length})</h3>
-          <button class="btn-secondary" onclick="clearMergeVideos()">Temizle</button>
-        </div>
-        <div class="merge-items">
-          ${mergeVideos.map((path, index) => {
-            const fileName = path.split(/[\\/]/).pop() || 'unknown';
-            return `
-              <div class="merge-item" data-index="${index}">
-                <span class="merge-order">${index + 1}</span>
-                <i data-lucide="video"></i>
-                <span class="file-name">${fileName}</span>
-                <button class="btn-icon" onclick="removeMergeVideo(${index})" title="Kaldır">
-                  <i data-lucide="trash-2"></i>
-                </button>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      `;
-      
-      createIcons({ icons: allIcons });
-    }
-    
-    (window as any).clearSelectedVideos = () => {
-      selectedVideos = [];
-      renderSelectedVideos();
-    };
-    
-    (window as any).removeVideo = (index: number) => {
-      selectedVideos.splice(index, 1);
-      renderSelectedVideos();
-    };
-    
-    (window as any).clearMergeVideos = () => {
-      mergeVideos = [];
-      renderMergeList();
-    };
-    
-    (window as any).removeMergeVideo = (index: number) => {
-      mergeVideos.splice(index, 1);
-      renderMergeList();
-    };
-    
-    (window as any).optimizeAllVideos = async () => {
-      if (!selectedVideosContainer) return;
-      
-      const fileItems = selectedVideosContainer.querySelectorAll('.selected-file-item');
-      
-      for (let i = 0; i < selectedVideos.length; i++) {
-        const filePath = selectedVideos[i];
-        const fileItem = fileItems[i];
-        
-        const qualitySelect = fileItem.querySelector('.format-select') as HTMLSelectElement;
-        const quality = qualitySelect?.value || 'medium';
-        
-        await optimizeVideo(filePath, quality);
-      }
-      
-      selectedVideos = [];
-      renderSelectedVideos();
-    };
-    
-    async function optimizeVideo(filePath: string, quality: string) {
-      const { invoke } = await import('@tauri-apps/api/core');
-      
-      const fileName = filePath.split(/[\\/]/).pop() || 'unknown';
-      const outputDir = localStorage.getItem('outputPath') || null;
-      
-      const queueItem = document.createElement('div');
-      queueItem.className = 'queue-item';
-      queueItem.innerHTML = `
-        <div class="queue-item-info">
-          <span class="queue-item-name">${fileName}</span>
-          <span class="queue-item-status">Optimize ediliyor... (${quality})</span>
-        </div>
-        <div class="queue-item-progress">
-          <div class="progress-bar"></div>
-        </div>
-      `;
-      videoQueue?.appendChild(queueItem);
-      
-      try {
-        const result: any = await invoke('optimize_video', {
-          filePath: filePath,
-          outputDir: outputDir,
-          quality: quality
-        });
-        
-        // Save to database
-        await saveVideo(result);
-        
-        queueItem.querySelector('.queue-item-status')!.textContent = `Tamamlandı! (${result.duration})`;
-        queueItem.classList.add('success');
-        
-        // Reload recent videos
-        await loadRecentVideos();
-        
-        setTimeout(() => {
-          queueItem.remove();
-        }, 3000);
-        
-      } catch (error) {
-        console.error('Video optimization error:', error);
-        queueItem.querySelector('.queue-item-status')!.textContent = `Hata: ${error}`;
-        queueItem.classList.add('error');
-      }
-    }
-    
-    mergeVideosBtn?.addEventListener('click', async () => {
-      if (mergeVideos.length < 2) {
-        alert('En az 2 video seçmelisiniz!');
-        return;
-      }
-      
-      const { invoke } = await import('@tauri-apps/api/core');
-      const outputDir = localStorage.getItem('outputPath') || null;
-      
-      const queueItem = document.createElement('div');
-      queueItem.className = 'queue-item';
-      queueItem.innerHTML = `
-        <div class="queue-item-info">
-          <span class="queue-item-name">${mergeVideos.length} video birleştiriliyor...</span>
-          <span class="queue-item-status">İşleniyor...</span>
-        </div>
-        <div class="queue-item-progress">
-          <div class="progress-bar"></div>
-        </div>
-      `;
-      mergeQueue?.appendChild(queueItem);
-      
-      try {
-        const result: any = await invoke('merge_videos', {
-          filePaths: mergeVideos,
-          outputDir: outputDir
-        });
-        
-        // Save to database
-        await saveVideo(result);
-        
-        queueItem.querySelector('.queue-item-status')!.textContent = `Tamamlandı! (${result.duration})`;
-        queueItem.classList.add('success');
-        
-        mergeVideos = [];
-        renderMergeList();
-        
-        // Reload recent videos
-        await loadRecentVideos();
-        
-        setTimeout(() => {
-          queueItem.remove();
-        }, 3000);
-        
-      } catch (error) {
-        console.error('Video merge error:', error);
-        queueItem.querySelector('.queue-item-status')!.textContent = `Hata: ${error}`;
-        queueItem.classList.add('error');
-      }
-    });
-
-    async function loadRecentVideos() {
-      const videoResultsGrid = document.getElementById('videoResultsGrid');
-      if (!videoResultsGrid) return;
-
-      try {
-        const videos = await getVideos();
-        
-        if (videos.length === 0) {
-          videoResultsGrid.innerHTML = '<p class="empty-message">Henüz dönüştürülmüş video yok</p>';
-          return;
-        }
-
-        // Show last 6 videos
-        const recentVideos = videos.slice(0, 6);
-        
-        // Import invoke for getting thumbnails
-        const { invoke } = await import('@tauri-apps/api/core');
-        
-        // Load videos with thumbnails
-        const videoPromises = recentVideos.map(async (video) => {
-          try {
-            const thumbnail = await invoke('get_video_thumbnail', { filePath: video.output_path }) as string;
-            return { ...video, thumbnail };
-          } catch (error) {
-            console.error('Failed to load thumbnail:', video.output_path, error);
-            return { ...video, thumbnail: '' };
-          }
-        });
-        
-        const videosWithThumbnails = await Promise.all(videoPromises);
-        
-        videoResultsGrid.innerHTML = videosWithThumbnails.map(video => {
-          const escapedPath = video.output_path.replace(/\\/g, '\\\\');
-          return `
-          <div class="result-card video-card">
-            <div class="video-preview" onclick='playVideo(\`${escapedPath}\`, "${video.converted_name}")' style="${video.thumbnail ? `background-image: url('${video.thumbnail}'); background-size: cover; background-position: center;` : ''}">
-              <i data-lucide="play" class="play-icon"></i>
-              <span class="video-duration">${video.duration}</span>
-            </div>
-            <div class="result-card-header">
-              <span class="result-format">MP4</span>
-              <span class="result-size">${formatFileSize(video.file_size)}</span>
-            </div>
-            <div class="result-card-body">
-              <h4>${video.converted_name}</h4>
-              <p class="result-meta">${video.created_at}</p>
-            </div>
-            <div class="result-card-actions">
-              <button class="action-btn" onclick='openFileLocation(\`${escapedPath}\`)' title="Dosya Konumunu Aç">
-                <i data-lucide="folder-open"></i>
-              </button>
-            </div>
-          </div>
-        `;
-        }).join('');
-
-        createIcons({ icons: allIcons });
-      } catch (error) {
-        console.error('Load video results error:', error);
-      }
-    }
-    
-    // Load recent videos on page load
-    loadRecentVideos();
-
-    async function loadArchive() {
-      const archiveList = document.getElementById('archiveList');
-      
-      if (!archiveList) return;
-
-      try {
-        const allMedia = await getAllMedia();
-        
-        if (allMedia.length === 0) {
-          archiveList.innerHTML = '<p class="empty-message">Henüz dönüştürülmüş dosya yok</p>';
-          return;
-        }
-
-        // Import invoke for getting previews
-        const { invoke } = await import('@tauri-apps/api/core');
-        
-        // Load media with previews
-        const mediaPromises = allMedia.map(async (item: any) => {
-          if (item.type === 'image') {
-            try {
-              const dataUrl = await invoke('get_image_data_url', { filePath: item.output_path }) as string;
-              return { ...item, dataUrl };
-            } catch (error) {
-              console.error('Failed to load image:', item.output_path, error);
-              return { ...item, dataUrl: '' };
-            }
-          } else {
-            // Video - get thumbnail
-            try {
-              const thumbnail = await invoke('get_video_thumbnail', { filePath: item.output_path }) as string;
-              return { ...item, dataUrl: thumbnail };
-            } catch (error) {
-              console.error('Failed to load video thumbnail:', item.output_path, error);
-              return { ...item, dataUrl: '' };
-            }
-          }
-        });
-        
-        const mediaWithData = await Promise.all(mediaPromises);
-
-        archiveList.innerHTML = mediaWithData.map(item => {
-          const escapedPath = item.output_path.replace(/\\/g, '\\\\');
-          const isVideo = item.type === 'video';
-          
-          return `
-          <div class="archive-item" data-id="${item.id}" data-type="${item.type}">
-            <input type="checkbox" class="archive-checkbox" data-id="${item.id}" data-path="${escapedPath}" data-type="${item.type}">
-            ${isVideo ? `
-            <div class="archive-preview video-preview-small" onclick='playVideo(\`${escapedPath}\`, "${item.converted_name}")' style="${item.dataUrl ? `background-image: url('${item.dataUrl}'); background-size: cover; background-position: center;` : ''}">
-              <i data-lucide="play"></i>
-              <span class="video-duration-small">${item.duration}</span>
-            </div>
-            ` : item.dataUrl ? `
-            <div class="archive-preview">
-              <img src="${item.dataUrl}" alt="${item.converted_name}" />
-            </div>
-            ` : ''}
-            <div class="archive-item-info">
-              <h4>${item.converted_name}</h4>
-              <p class="archive-meta">
-                ${isVideo ? `
-                  <span>Video (${item.duration})</span>
-                ` : `
-                  <span>${item.original_format} → ${item.converted_format}</span>
-                `}
-                <span>${formatFileSize(item.file_size)}</span>
-                <span>${item.created_at}</span>
-              </p>
-            </div>
-            <div class="archive-item-actions">
-              <button class="action-btn" onclick='openFileLocation(\`${escapedPath}\`)' title="Dosya Konumunu Aç">
-                <i data-lucide="folder-open"></i>
-              </button>
-              <button class="action-btn delete-btn" onclick='deleteMedia("${item.id}", \`${escapedPath}\`, "${item.type}")' title="Sil">
-                <i data-lucide="trash-2"></i>
-              </button>
-            </div>
-          </div>
-        `;
-        }).join('');
-
-        // Add checkbox event listeners
-        const checkboxes = archiveList.querySelectorAll('.archive-checkbox');
-        checkboxes.forEach(checkbox => {
-          checkbox.addEventListener('change', updateSelectionUI);
-        });
-
-        createIcons({
-          icons: allIcons
-        });
-      } catch (error) {
-        console.error('Archive load error:', error);
-        archiveList.innerHTML = '<p class="empty-message">Arşiv yüklenirken hata oluştu</p>';
-      }
-    }
-
-    function updateSelectionUI() {
-      const checkboxes = document.querySelectorAll('.archive-checkbox:checked');
-      const archiveActions = document.getElementById('archiveActions');
-      const selectedCount = document.getElementById('selectedCount');
-      
-      if (checkboxes.length > 0) {
-        archiveActions!.style.display = 'flex';
-        selectedCount!.textContent = `${checkboxes.length} seçili`;
-      } else {
-        archiveActions!.style.display = 'none';
-      }
-    }
-
-    // Delete selected items
-    const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
-    deleteSelectedBtn?.addEventListener('click', async () => {
-      const checkboxes = document.querySelectorAll('.archive-checkbox:checked') as NodeListOf<HTMLInputElement>;
-      
-      if (checkboxes.length === 0) return;
-      
-      if (!confirm(`${checkboxes.length} fotoğrafı silmek istediğinizden emin misiniz?`)) {
-        return;
-      }
-
-      const { invoke } = await import('@tauri-apps/api/core');
-      
-      for (const checkbox of checkboxes) {
-        const id = checkbox.dataset.id!;
-        const filePath = checkbox.dataset.path!.replace(/\\\\/g, '\\');
-        
-        try {
-          // Delete from database first
-          await deleteImageFromDB(id);
-          
-          // Then delete file
-          await invoke('delete_converted_image', { id, filePath });
-        } catch (error) {
-          console.error('Delete error:', error);
-        }
-      }
-      
-      // Reload archive and results
-      await loadArchive();
-      await loadConvertedResults();
-    });
-
-    // Cancel selection
-    const cancelSelectionBtn = document.getElementById('cancelSelectionBtn');
-    cancelSelectionBtn?.addEventListener('click', () => {
-      const checkboxes = document.querySelectorAll('.archive-checkbox:checked') as NodeListOf<HTMLInputElement>;
-      checkboxes.forEach(checkbox => {
-        checkbox.checked = false;
-      });
-      updateSelectionUI();
-    });
-
-    function formatFileSize(bytes: number): string {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-    }
-
-    // Global functions for archive actions
-    (window as any).openFileLocation = async (path: string) => {
-      const { invoke } = await import('@tauri-apps/api/core');
-      try {
-        console.log('Opening file location:', path);
-        await invoke('open_file_location', { filePath: path });
-      } catch (error) {
-        console.error('Open location error:', error);
-        alert(`Dosya konumu açılamadı: ${error}`);
-      }
-    };
-
-    (window as any).deleteImage = async (id: string, filePath: string) => {
-      const { invoke } = await import('@tauri-apps/api/core');
-      try {
-        // Delete from database first
-        await deleteImageFromDB(id);
-        
-        // Then delete file
-        await invoke('delete_converted_image', { id, filePath });
-        
-        // Reload archive and results
-        await loadArchive();
-        await loadConvertedResults();
-      } catch (error) {
-        console.error('Delete error:', error);
-        alert('Fotoğraf silinemedi');
-      }
-    };
-    
-    (window as any).deleteMedia = async (id: string, filePath: string, type: string) => {
-      const { invoke } = await import('@tauri-apps/api/core');
-      try {
-        // Delete from database first
-        if (type === 'image') {
-          await deleteImageFromDB(id);
-        } else {
-          await deleteVideoFromDB(id);
-        }
-        
-        // Then delete file
-        await invoke('delete_converted_image', { id, filePath });
-        
-        // Reload archive and results
-        await loadArchive();
-        if (type === 'image') {
-          await loadConvertedResults();
-        } else {
-          await loadRecentVideos();
-        }
-      } catch (error) {
-        console.error('Delete error:', error);
-        alert('Dosya silinemedi');
-      }
-    };
-    
-    (window as any).playVideo = async (filePath: string, fileName: string) => {
-      // Convert file path to proper URL using Tauri's convertFileSrc
-      const { convertFileSrc } = await import('@tauri-apps/api/core');
-      const videoUrl = convertFileSrc(filePath);
-      
-      // Simple video player modal
-      const modal = document.createElement('div');
-      modal.className = 'video-modal';
-      modal.innerHTML = `
-        <div class="video-modal-content">
-          <div class="video-modal-header">
-            <h3>${fileName}</h3>
-            <button class="modal-close" onclick="this.closest('.video-modal').remove()">×</button>
-          </div>
-          <video controls autoplay>
-            <source src="${videoUrl}" type="video/mp4">
-            Tarayıcınız video oynatmayı desteklemiyor.
-          </video>
-        </div>
-      `;
-      document.body.appendChild(modal);
-      
-      // Close on background click
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          modal.remove();
-        }
-      });
-    };
-
-    // Sidebar toggle functionality
-    const menuToggle = document.getElementById("menuToggle");
-    const sidebar = document.getElementById("sidebar");
-
-    menuToggle?.addEventListener("click", () => {
-      sidebar?.classList.toggle("open");
-    });
-
-    // Close sidebar when clicking outside on mobile
-    document.addEventListener("click", (e) => {
-      const target = e.target as HTMLElement;
-      if (window.innerWidth < 768 && 
-          !sidebar?.contains(target) && 
-          !menuToggle?.contains(target) &&
-          sidebar?.classList.contains("open")) {
-        sidebar?.classList.remove("open");
-      }
-    });
+    );
   }
 });
+
+function setupUpdateChecker() {
+  const updateStatusBtn = document.getElementById("updateStatusBtn");
+  const updateText = updateStatusBtn?.querySelector('.update-text');
+  const updateIcon = updateStatusBtn?.querySelector('i');
+  
+  async function checkUpdateStatus() {
+    try {
+      const { checkUpdateStatus: getUpdateStatus } = await import('./updater');
+      const status = await getUpdateStatus();
+      
+      if (status.available && updateStatusBtn && updateText && updateIcon) {
+        updateStatusBtn.classList.add('update-available');
+        updateText.textContent = 'Güncelleme mevcut';
+        updateIcon.setAttribute('data-lucide', 'download');
+        initIcons();
+      } else if (updateStatusBtn && updateText && updateIcon) {
+        updateStatusBtn.classList.remove('update-available');
+        updateText.textContent = 'Uygulama güncel';
+        updateIcon.setAttribute('data-lucide', 'check-circle');
+        initIcons();
+      }
+    } catch (error) {
+      console.error('Güncelleme kontrolü hatası:', error);
+    }
+  }
+
+  // İlk kontrol
+  checkUpdateStatus();
+  
+  // Her 30 dakikada bir kontrol et
+  setInterval(checkUpdateStatus, 30 * 60 * 1000);
+
+  updateStatusBtn?.addEventListener("click", async () => {
+    const { checkForUpdates } = await import('./updater');
+    await checkForUpdates(true);
+    // Güncelleme kontrolünden sonra durumu yenile
+    await checkUpdateStatus();
+  });
+}

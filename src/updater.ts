@@ -1,7 +1,7 @@
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
-export async function checkForUpdates() {
+export async function checkForUpdates(forcePrompt: boolean = false) {
   try {
     console.log('Güncelleme kontrolü başlıyor...');
     const update = await check();
@@ -11,7 +11,6 @@ export async function checkForUpdates() {
     if (update?.available) {
       console.log(`Update available: ${update.version}`);
       
-      // Kullanıcıya güncelleme var mı diye sor
       const shouldUpdate = confirm(
         `Yeni versiyon mevcut: ${update.version}\n\nŞimdi güncellemek ister misiniz?`
       );
@@ -19,7 +18,6 @@ export async function checkForUpdates() {
       if (shouldUpdate) {
         console.log('Güncelleme indiriliyor...');
         
-        // Güncellemeyi indir ve kur
         await update.downloadAndInstall((progress) => {
           if (progress.event === 'Started') {
             console.log('İndirme başladı...');
@@ -30,11 +28,28 @@ export async function checkForUpdates() {
           }
         });
         
-        // Uygulamayı yeniden başlat
         await relaunch();
       }
+    } else if (forcePrompt) {
+      alert('Uygulama güncel. Yeni bir güncelleme bulunmuyor.');
     }
   } catch (error) {
     console.error('Güncelleme kontrolü hatası:', error);
+    if (forcePrompt) {
+      alert('Güncelleme kontrolü sırasında bir hata oluştu.');
+    }
+  }
+}
+
+export async function checkUpdateStatus(): Promise<{ available: boolean; version?: string }> {
+  try {
+    const update = await check();
+    return {
+      available: update?.available || false,
+      version: update?.version
+    };
+  } catch (error) {
+    console.error('Güncelleme durumu kontrolü hatası:', error);
+    return { available: false };
   }
 }

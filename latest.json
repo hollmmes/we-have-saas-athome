@@ -1,11 +1,11 @@
 {
-  "version": "0.4.0",
-  "notes": "Video Editör eklendi! Timeline tabanlı video düzenleme, kesme, birleştirme ve daha fazlası.",
-  "pub_date": "2025-01-12T20:00:00Z",
+  "version": "0.5.0",
+  "notes": "Modüler yapı refactoring, arşiv silme düzeltmesi, geliştirilmiş güncelleme sistemi ve hata düzeltmeleri.",
+  "pub_date": "2025-01-15T12:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUYlZVaG4yY1hhY0k4eit2ajd0SUxZZnQ2UThxK3FWaGcrRHBvbzN0NmNnbzFmdXNUNzdJMXJVM0JkcGx2RUxWcHduamtkTEJSU1BJZldaaTRxYVk3dWgwQ0lxNHc3U3c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzczNTQyMzA2CWZpbGU6V2UgSGF2ZSBTYWFTIGF0IEhvbWVfMC40LjBfeDY0LXNldHVwLmV4ZQpOSktOZ3orR01DSHpiOVlDVGNndlBZb3RNeFpOdFRYSjJ0ZGtFV0g0cmF3cUhqQkV1TmNNTm1nOXpGTHdGc3lsZXRuaUhWYldmVWRGVDFLSngwN1VDdz09Cg==",
-      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.4.0/We.Have.SaaS.at.Home_0.4.0_x64-setup.exe"
+      "signature": "",
+      "url": "https://github.com/hollmmes/we-have-saas-athome/releases/download/v0.5.0/We.Have.SaaS.at.Home_0.5.0_x64-setup.exe"
     }
   }
 }

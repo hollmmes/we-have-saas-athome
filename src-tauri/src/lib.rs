@@ -25,6 +25,22 @@ pub struct ConvertedVideo {
     created_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DomainInfo {
+    id: String,
+    domain: String,
+    ssl_status: String,
+    ssl_start: String,
+    ssl_end: String,
+    ssl_days: i64,
+    ssl_issuer: String,
+    domain_status: String,
+    domain_start: String,
+    domain_end: String,
+    domain_days: i64,
+    last_checked: String,
+}
+
 #[tauri::command]
 async fn convert_image(
     file_path: String,
@@ -680,195 +696,243 @@ async fn merge_videos(
 }
 
 #[tauri::command]
-async fn get_video_duration(
-    file_path: String,
-    app_handle: tauri::AppHandle,
-) -> Result<f64, String> {
-    use std::process::Command;
-    
-    // Dosyanın var olup olmadığını kontrol et
-    let input_path = std::path::PathBuf::from(&file_path);
-    if !input_path.exists() {
-        return Err(format!("Video dosyası bulunamadı: {}", file_path));
-    }
-    
-    // FFprobe path'ini al
-    let ffprobe_path = if cfg!(debug_assertions) {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-        let ffprobe = std::path::PathBuf::from(manifest_dir)
-            .join("ffmpeg")
-            .join("ffprobe.exe");
-        ffprobe.to_str().unwrap().to_string()
-    } else {
-        app_handle
-            .path()
-            .resolve("ffprobe.exe", tauri::path::BaseDirectory::Resource)
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| "ffprobe".to_string())
-    };
-    
-    // Windows için path'i düzelt
-    let file_path_normalized = file_path.replace("\\", "/");
-    
-    // FFprobe ile süreyi al
-    let output = Command::new(&ffprobe_path)
-        .args(&[
-            "-v", "error",
-            "-show_entries", "format=duration",
-            "-of", "default=noprint_wrappers=1:nokey=1",
-            &file_path_normalized
-        ])
-        .output()
-        .map_err(|e| format!("FFprobe çalıştırılamadı: {}", e))?;
-    
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Video süresi alınamadı: {}", error));
-    }
-    
-    let duration_str = String::from_utf8_lossy(&output.stdout);
-    let duration: f64 = duration_str.trim().parse().unwrap_or(0.0);
-    
-    Ok(duration)
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct TimelineClipData {
-    path: String,
-    trim_start: f64,
-    trim_end: f64,
-    track: String,
-}
-
-#[tauri::command]
-async fn export_timeline(
-    clips: Vec<TimelineClipData>,
-    quality: String,
-    app_handle: tauri::AppHandle,
-) -> Result<String, String> {
-    use std::fs;
-    use std::io::Write;
-    use std::process::Command;
+async fn check_ssl_certificate(domain: String) -> Result<DomainInfo, String> {
+    use std::net::TcpStream;
+    use native_tls::TlsConnector;
+    use x509_parser::prelude::*;
     use uuid::Uuid;
     
-    if clips.is_empty() {
-        return Err("Timeline boş!".to_string());
+    let clean_domain = domain
+        .replace("http://", "")
+        .replace("https://", "")
+        .replace("/", "")
+        .trim()
+        .to_string();
+    
+    if clean_domain.is_empty() {
+        return Err("Geçersiz domain".to_string());
     }
-    
-    // FFmpeg path'ini al
-    let ffmpeg_path = if cfg!(debug_assertions) {
-        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap();
-        let ffmpeg = std::path::PathBuf::from(manifest_dir)
-            .join("ffmpeg")
-            .join("ffmpeg.exe");
-        ffmpeg.to_str().unwrap().to_string()
-    } else {
-        app_handle
-            .path()
-            .resolve("ffmpeg.exe", tauri::path::BaseDirectory::Resource)
-            .ok()
-            .and_then(|p| p.to_str().map(|s| s.to_string()))
-            .unwrap_or_else(|| "ffmpeg".to_string())
-    };
-    
-    // Output klasörünü belirle
-    let app_data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("App data dizini alınamadı: {}", e))?;
-    let output_dir = app_data_dir.join("exported_videos");
-    fs::create_dir_all(&output_dir).map_err(|e| format!("Klasör oluşturulamadı: {}", e))?;
-    
-    // Temp klasör
-    let temp_dir = app_data_dir.join("temp");
-    fs::create_dir_all(&temp_dir).map_err(|e| format!("Temp klasör oluşturulamadı: {}", e))?;
     
     let id = Uuid::new_v4().to_string();
+    let last_checked = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     
-    // Her clip'i trim et ve temp dosyalara kaydet
-    let mut trimmed_files = Vec::new();
-    
-    for (i, clip) in clips.iter().enumerate() {
-        let temp_file = temp_dir.join(format!("clip_{}_{}.mp4", &id[..8], i));
-        
-        // Trim işlemi
-        let duration = clip.trim_end - clip.trim_start;
-        
-        let output = Command::new(&ffmpeg_path)
-            .args(&[
-                "-ss", &clip.trim_start.to_string(),
-                "-i", &clip.path,
-                "-t", &duration.to_string(),
-                "-c", "copy",
-                "-y",
-                temp_file.to_str().unwrap()
-            ])
-            .output()
-            .map_err(|e| format!("FFmpeg trim hatası: {}", e))?;
-        
-        if !output.status.success() {
-            let error = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Clip trim hatası: {}", error));
-        }
-        
-        trimmed_files.push(temp_file);
-    }
-    
-    // Concat dosyası oluştur
-    let concat_file = temp_dir.join(format!("concat_{}.txt", &id[..8]));
-    let mut concat_content = fs::File::create(&concat_file)
-        .map_err(|e| format!("Concat dosyası oluşturulamadı: {}", e))?;
-    
-    for file in &trimmed_files {
-        writeln!(concat_content, "file '{}'", file.to_str().unwrap().replace("\\", "/"))
-            .map_err(|e| format!("Concat yazma hatası: {}", e))?;
-    }
-    drop(concat_content);
-    
-    // Final output
-    let output_name = format!("export_{}.mp4", &id[..8]);
-    let output_path = output_dir.join(&output_name);
-    
-    // Quality ayarları
-    let (crf, preset) = match quality.as_str() {
-        "ultra" => ("15", "slow"),
-        "high" => ("18", "medium"),
-        "medium" => ("23", "medium"),
-        "low" => ("28", "fast"),
-        _ => ("23", "medium"),
+    // SSL Sertifika Kontrolü
+    let (ssl_status, ssl_start, ssl_end, ssl_days, ssl_issuer) = match check_ssl_info(&clean_domain).await {
+        Ok(info) => info,
+        Err(_) => (
+            "❌ Durmuş / Yok".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            0,
+            "Bilinmiyor".to_string()
+        ),
     };
     
-    // Final encode
-    let output = Command::new(&ffmpeg_path)
-        .args(&[
-            "-f", "concat",
-            "-safe", "0",
-            "-i", concat_file.to_str().unwrap(),
-            "-c:v", "libx264",
-            "-crf", crf,
-            "-preset", preset,
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-movflags", "+faststart",
-            "-y",
-            output_path.to_str().unwrap()
-        ])
-        .output()
-        .map_err(|e| format!("FFmpeg encode hatası: {}", e))?;
+    // Domain WHOIS Kontrolü
+    let (domain_status, domain_start, domain_end, domain_days) = match check_whois_info(&clean_domain).await {
+        Ok(info) => info,
+        Err(_) => (
+            "❌ Bilinmiyor".to_string(),
+            "-".to_string(),
+            "-".to_string(),
+            0,
+        ),
+    };
     
-    // Temp dosyaları temizle
-    for file in trimmed_files {
-        let _ = fs::remove_file(file);
+    Ok(DomainInfo {
+        id,
+        domain: clean_domain,
+        ssl_status,
+        ssl_start,
+        ssl_end,
+        ssl_days,
+        ssl_issuer,
+        domain_status,
+        domain_start,
+        domain_end,
+        domain_days,
+        last_checked,
+    })
+}
+
+async fn check_ssl_info(domain: &str) -> Result<(String, String, String, i64, String), String> {
+    use std::net::TcpStream;
+    use native_tls::TlsConnector;
+    use x509_parser::prelude::*;
+    
+    // TCP bağlantısı kur
+    let stream = TcpStream::connect(format!("{}:443", domain))
+        .map_err(|e| format!("Bağlantı hatası: {}", e))?;
+    
+    // TLS bağlantısı kur
+    let connector = TlsConnector::new()
+        .map_err(|e| format!("TLS connector hatası: {}", e))?;
+    
+    let tls_stream = connector.connect(domain, stream)
+        .map_err(|e| format!("TLS bağlantı hatası: {}", e))?;
+    
+    // Sertifikayı al
+    let cert_der = tls_stream
+        .peer_certificate()
+        .map_err(|e| format!("Sertifika alınamadı: {}", e))?
+        .ok_or("Sertifika bulunamadı")?
+        .to_der()
+        .map_err(|e| format!("DER dönüşüm hatası: {}", e))?;
+    
+    // Sertifikayı parse et
+    let (_, cert) = X509Certificate::from_der(&cert_der)
+        .map_err(|e| format!("Sertifika parse hatası: {}", e))?;
+    
+    // Başlangıç tarihi
+    let start_time = cert.validity().not_before.timestamp();
+    let ssl_start = chrono::DateTime::from_timestamp(start_time, 0)
+        .map(|dt| dt.format("%d.%m.%Y").to_string())
+        .unwrap_or("-".to_string());
+    
+    // Bitiş tarihi
+    let end_time = cert.validity().not_after.timestamp();
+    let ssl_end = chrono::DateTime::from_timestamp(end_time, 0)
+        .map(|dt| dt.format("%d.%m.%Y").to_string())
+        .unwrap_or("-".to_string());
+    
+    // Kalan gün sayısı
+    let now = chrono::Utc::now().timestamp();
+    let ssl_days = (end_time - now) / 86400;
+    
+    // Durum
+    let ssl_status = if ssl_days > 0 {
+        "✅ Çalışıyor".to_string()
+    } else {
+        "❌ Süresi Bitmiş".to_string()
+    };
+    
+    // Issuer (Yayıncı)
+    let ssl_issuer = cert
+        .issuer()
+        .iter_organization()
+        .next()
+        .and_then(|attr| attr.as_str().ok())
+        .unwrap_or("Bilinmiyor")
+        .to_string();
+    
+    Ok((ssl_status, ssl_start, ssl_end, ssl_days, ssl_issuer))
+}
+
+async fn check_whois_info(domain: &str) -> Result<(String, String, String, i64), String> {
+    use tokio::net::TcpStream;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::time::{timeout, Duration};
+    
+    // İlk olarak IANA WHOIS sunucusuna bağlan
+    let whois_server = "whois.iana.org:43";
+    
+    let stream = timeout(
+        Duration::from_secs(5),
+        TcpStream::connect(whois_server)
+    )
+    .await
+    .map_err(|_| "WHOIS bağlantı zaman aşımı")?
+    .map_err(|e| format!("WHOIS bağlantı hatası: {}", e))?;
+    
+    let mut stream = stream;
+    
+    // Domain sorgula
+    stream.write_all(format!("{}\r\n", domain).as_bytes())
+        .await
+        .map_err(|e| format!("WHOIS yazma hatası: {}", e))?;
+    
+    // Yanıtı oku
+    let mut response = String::new();
+    stream.read_to_string(&mut response)
+        .await
+        .map_err(|e| format!("WHOIS okuma hatası: {}", e))?;
+    
+    // Refer satırını bul (gerçek WHOIS sunucusu)
+    let actual_whois = if let Some(line) = response.lines().find(|l| l.to_lowercase().starts_with("refer:")) {
+        line.split(':').nth(1).unwrap_or("").trim().to_string()
+    } else {
+        return Err("WHOIS sunucusu bulunamadı".to_string());
+    };
+    
+    // Gerçek WHOIS sunucusuna bağlan
+    let stream = timeout(
+        Duration::from_secs(5),
+        TcpStream::connect(format!("{}:43", actual_whois))
+    )
+    .await
+    .map_err(|_| "WHOIS bağlantı zaman aşımı")?
+    .map_err(|e| format!("WHOIS bağlantı hatası: {}", e))?;
+    
+    let mut stream = stream;
+    
+    // Domain sorgula
+    stream.write_all(format!("{}\r\n", domain).as_bytes())
+        .await
+        .map_err(|e| format!("WHOIS yazma hatası: {}", e))?;
+    
+    // Yanıtı oku
+    let mut response = String::new();
+    stream.read_to_string(&mut response)
+        .await
+        .map_err(|e| format!("WHOIS okuma hatası: {}", e))?;
+    
+    // Tarihleri parse et
+    let domain_start = parse_whois_date(&response, &["creation date", "created on", "registration time", "created"])
+        .unwrap_or("-".to_string());
+    
+    let domain_end = parse_whois_date(&response, &["expiry date", "expiration date", "registry expiry date", "expires"])
+        .unwrap_or("-".to_string());
+    
+    // Kalan gün sayısını hesapla
+    let domain_days = if domain_end != "-" {
+        calculate_days_until(&domain_end)
+    } else {
+        0
+    };
+    
+    // Durum
+    let domain_status = if domain_days > 1 {
+        "✅ Çalışıyor".to_string()
+    } else {
+        "❌ Süresi Bitmiş".to_string()
+    };
+    
+    Ok((domain_status, domain_start, domain_end, domain_days))
+}
+
+fn parse_whois_date(response: &str, keywords: &[&str]) -> Option<String> {
+    for line in response.lines() {
+        let line_lower = line.to_lowercase();
+        for keyword in keywords {
+            if line_lower.starts_with(keyword) {
+                if let Some(date_str) = line.split(':').nth(1) {
+                    let date_str = date_str.trim().split_whitespace().next()?;
+                    // Parse ISO date format
+                    if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(date_str) {
+                        return Some(parsed.format("%d.%m.%Y").to_string());
+                    }
+                    // Try other formats
+                    if let Ok(parsed) = chrono::NaiveDateTime::parse_from_str(date_str, "%Y-%m-%dT%H:%M:%SZ") {
+                        return Some(parsed.format("%d.%m.%Y").to_string());
+                    }
+                    if let Ok(parsed) = chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d") {
+                        return Some(parsed.format("%d.%m.%Y").to_string());
+                    }
+                }
+            }
+        }
     }
-    let _ = fs::remove_file(concat_file);
-    
-    if !output.status.success() {
-        let error = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Export hatası: {}", error));
+    None
+}
+
+fn calculate_days_until(date_str: &str) -> i64 {
+    // Parse dd.mm.yyyy format
+    if let Ok(date) = chrono::NaiveDate::parse_from_str(date_str, "%d.%m.%Y") {
+        let now = chrono::Local::now().date_naive();
+        (date - now).num_days()
+    } else {
+        0
     }
-    
-    Ok(output_path.display().to_string())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -889,8 +953,7 @@ pub fn run() {
             optimize_video,
             merge_videos,
             get_video_thumbnail,
-            get_video_duration,
-            export_timeline
+            check_ssl_certificate
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
