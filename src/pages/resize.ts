@@ -1,5 +1,3 @@
-import { initIcons } from '../utils/icons';
-
 let resizeW = 350;
 let resizeH = 390;
 let resizeBadges = [

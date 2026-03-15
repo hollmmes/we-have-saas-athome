@@ -6,6 +6,9 @@ let selectedVideos: string[] = [];
 let mergeVideos: string[] = [];
 
 export function setupVideoPage() {
+  // Make functions global for onclick handlers
+  (window as any).openFileLocation = openFileLocation;
+  
   // Tab switching
   const tabBtns = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');

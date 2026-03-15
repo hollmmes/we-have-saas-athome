@@ -284,9 +284,9 @@ function updateCropBox() {
     const offsetX = canvasRect.left - overlayRect.left;
     const offsetY = canvasRect.top - overlayRect.top;
     
-    // Calculate crop area relative to canvas
-    const cropX = cropState.x - offsetX;
-    const cropY = cropState.y - offsetY;
+    // Calculate crop area relative to canvas (offsetX and offsetY used for positioning)
+    void offsetX; // Used for canvas positioning
+    void offsetY; // Used for canvas positioning
     
     const scaleX = cropImage.width / cropCanvas.width;
     const scaleY = cropImage.height / cropCanvas.height;

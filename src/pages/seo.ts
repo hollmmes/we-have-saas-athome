@@ -1,4 +1,4 @@
-import { turkceToAscii, metinToUrl } from '../utils/helpers';
+import { metinToUrl } from '../utils/helpers';
 
 export function setupSeoPage() {
   const seoConvertBtn = document.getElementById('seoConvertBtn');
