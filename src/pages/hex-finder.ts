@@ -1,5 +1,13 @@
 import { fileNameFromPath, isImagePath } from "../utils/helpers";
 import { initIcons } from "../utils/icons";
+import {
+  createPaletteId,
+  getSavedPalettes,
+  notifyApp,
+  registerWatchProcessor,
+  savePalette,
+  subscribeWorkflowChanges,
+} from "../workflow";
 
 type RgbColor = {
   r: number;
@@ -19,6 +27,7 @@ const pixelCanvas = document.createElement("canvas");
 const pixelContext = pixelCanvas.getContext("2d", { willReadFrequently: true });
 
 export function setupHexFinderPage() {
+  ensureHexWorkflowUi();
   const dropZone = document.getElementById("hexDropZone")!;
   const fileInput = document.getElementById("hexFileInput") as HTMLInputElement;
   const canvas = document.getElementById("hexCanvas") as HTMLCanvasElement;
@@ -26,6 +35,8 @@ export function setupHexFinderPage() {
   const placeholder = document.getElementById("hexPlaceholder");
   const zoomLens = document.getElementById("hexZoomLens")!;
   const openBtn = document.getElementById("hexOpenBtn")!;
+  const savePaletteBtn = document.getElementById("saveHexPaletteBtn");
+  const savedPaletteList = document.getElementById("hexSavedPaletteList");
 
   openBtn.addEventListener("click", () => fileInput.click());
   dropZone.addEventListener("click", () => fileInput.click());
@@ -95,6 +106,63 @@ export function setupHexFinderPage() {
     preview.setAttribute("hidden", "");
     placeholder.removeAttribute("hidden");
   }
+
+  savePaletteBtn?.addEventListener("click", () => {
+    if (!selectedSample) {
+      return;
+    }
+
+    const paletteNameInput = document.getElementById("hexPaletteName") as HTMLInputElement | null;
+    const paletteName = paletteNameInput?.value.trim() || `Palette ${rgbToHex(selectedSample.color)}`;
+    const colors = buildPalette(selectedSample.color).map((item) => item.hex);
+
+    savePalette({
+      id: createPaletteId(),
+      name: paletteName,
+      baseHex: rgbToHex(selectedSample.color),
+      colors,
+      note: `Saved from pixel ${selectedSample.x}, ${selectedSample.y}`,
+      createdAt: new Date().toISOString(),
+    });
+
+    if (paletteNameInput) {
+      paletteNameInput.value = "";
+    }
+
+    notifyApp("success", `Saved palette: ${paletteName}`);
+  });
+
+  savedPaletteList?.addEventListener("click", (event) => {
+    const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-palette-base]");
+    const paletteHex = button?.dataset.paletteBase;
+    if (!paletteHex) {
+      return;
+    }
+
+    const rgb = hexToRgb(paletteHex);
+    selectedSample = {
+      x: selectedSample?.x || 0,
+      y: selectedSample?.y || 0,
+      color: rgb,
+    };
+    renderSelection(selectedSample);
+  });
+
+  const unsubscribe = subscribeWorkflowChanges((section) => {
+    if (section === "palettes") {
+      renderSavedPalettes();
+    }
+  });
+
+  registerWatchProcessor("hex", async (paths) => {
+    if (paths[0]) {
+      await loadImageFromPath(paths[0]);
+      notifyApp("info", "Hex Finder loaded a new watched image.");
+    }
+  });
+
+  window.addEventListener("beforeunload", unsubscribe, { once: true });
+  renderSavedPalettes();
 }
 
 export async function handleHexFinderPaths(paths: string[]) {
@@ -553,6 +621,58 @@ function createImage(source: string) {
     image.onerror = () => reject(new Error("Gorsel yuklenemedi."));
     image.src = source;
   });
+}
+
+function ensureHexWorkflowUi() {
+  const controlPanel = document.querySelector("#hexFinderPage .hex-control-panel");
+  if (!controlPanel) {
+    return;
+  }
+
+  if (!document.getElementById("hexPaletteName")) {
+    const paletteCard = document.createElement("div");
+    paletteCard.className = "hex-info-card";
+    paletteCard.innerHTML = `
+      <div class="hex-info-header">
+        <h3>Saved Palettes</h3>
+        <i data-lucide="bookmark"></i>
+      </div>
+      <div class="hex-saved-actions">
+        <input id="hexPaletteName" class="monitor-input" type="text" placeholder="Palette name" />
+        <button class="btn-secondary btn-sm" type="button" id="saveHexPaletteBtn">Save Palette</button>
+      </div>
+      <div class="hex-saved-palette-list" id="hexSavedPaletteList"></div>
+    `;
+
+    controlPanel.appendChild(paletteCard);
+    initIcons();
+  }
+}
+
+function renderSavedPalettes() {
+  const container = document.getElementById("hexSavedPaletteList");
+  if (!container) {
+    return;
+  }
+
+  const palettes = getSavedPalettes();
+  if (palettes.length === 0) {
+    container.innerHTML = `<p class="empty-message">No saved palettes yet.</p>`;
+    return;
+  }
+
+  container.innerHTML = palettes
+    .slice(0, 6)
+    .map((palette) => `
+      <button class="hex-saved-palette" type="button" data-palette-base="${palette.baseHex}">
+        <span class="hex-saved-palette-swatches">
+          ${palette.colors.slice(0, 4).map((color) => `<span style="background:${color}"></span>`).join("")}
+        </span>
+        <strong>${palette.name}</strong>
+        <small>${palette.baseHex}</small>
+      </button>
+    `)
+    .join("");
 }
 
 window.addEventListener("resize", () => {

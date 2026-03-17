@@ -59,7 +59,7 @@ export async function saveImage(image: ConvertedImage): Promise<void> {
   await database.execute(
     `INSERT INTO converted_images
     (id, original_name, converted_name, original_format, converted_format, file_size, output_path, created_at)
-    VALUES (, , , , , , , )`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       image.id,
       image.original_name,
@@ -82,7 +82,7 @@ export async function getImages(): Promise<ConvertedImage[]> {
 
 export async function deleteImage(id: string): Promise<void> {
   const database = await initDatabase();
-  await database.execute('DELETE FROM converted_images WHERE id = U', [id]);
+  await database.execute('DELETE FROM converted_images WHERE id = ?', [id]);
 }
 
 export async function saveVideo(video: ConvertedVideo): Promise<void> {
@@ -91,7 +91,7 @@ export async function saveVideo(video: ConvertedVideo): Promise<void> {
   await database.execute(
     `INSERT INTO converted_videos
     (id, original_name, converted_name, file_size, output_path, duration, created_at)
-    VALUES (, , , , , , )`,
+    VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
       video.id,
       video.original_name,
@@ -113,7 +113,7 @@ export async function getVideos(): Promise<ConvertedVideo[]> {
 
 export async function deleteVideo(id: string): Promise<void> {
   const database = await initDatabase();
-  await database.execute('DELETE FROM converted_videos WHERE id = U', [id]);
+  await database.execute('DELETE FROM converted_videos WHERE id = ?', [id]);
 }
 
 export async function getAllMedia(): Promise<MediaRecord[]> {
@@ -135,17 +135,17 @@ export async function getAllMedia(): Promise<MediaRecord[]> {
 export async function saveDomain(domain: DomainInfo): Promise<void> {
   const database = await initDatabase();
   const existing = await database.select<Array<Pick<DomainInfo, 'id'>>>(
-    'SELECT id FROM domains WHERE domain = U',
+    'SELECT id FROM domains WHERE domain = ?',
     [domain.domain]
   );
 
   if (existing.length > 0) {
     await database.execute(
       `UPDATE domains SET
-        ssl_status = , ssl_start = , ssl_end = , ssl_days = , ssl_issuer = ,
-        domain_status = , domain_start = , domain_end = , domain_days = ,
-        last_checked = U
-      WHERE domain = U`,
+        ssl_status = ?, ssl_start = ?, ssl_end = ?, ssl_days = ?, ssl_issuer = ?,
+        domain_status = ?, domain_start = ?, domain_end = ?, domain_days = ?,
+        last_checked = ?
+      WHERE domain = ?`,
       [
         domain.ssl_status,
         domain.ssl_start,
@@ -167,7 +167,7 @@ export async function saveDomain(domain: DomainInfo): Promise<void> {
     `INSERT INTO domains
     (id, domain, ssl_status, ssl_start, ssl_end, ssl_days, ssl_issuer,
      domain_status, domain_start, domain_end, domain_days, last_checked)
-    VALUES (, , , , , , , , , , , )`,
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       domain.id,
       domain.domain,
@@ -194,5 +194,5 @@ export async function getDomains(): Promise<DomainInfo[]> {
 
 export async function deleteDomain(domain: string): Promise<void> {
   const database = await initDatabase();
-  await database.execute('DELETE FROM domains WHERE domain = U', [domain]);
+  await database.execute('DELETE FROM domains WHERE domain = ?', [domain]);
 }

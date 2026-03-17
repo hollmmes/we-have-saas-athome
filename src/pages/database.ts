@@ -1,5 +1,6 @@
 import { getImages, getVideos, getDomains } from "../database";
 import { initIcons } from "../utils/icons";
+import { loadWorkflowCenter } from "./workflow-center";
 
 export async function loadDatabaseStats() {
   try {
@@ -49,6 +50,7 @@ export async function loadDatabaseStats() {
     }
 
     initIcons();
+    loadWorkflowCenter();
   } catch (error) {
     console.error("Database stats error:", error);
   }

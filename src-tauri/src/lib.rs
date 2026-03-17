@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::process::{Command, Output};
 use tauri::Manager;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -39,6 +40,13 @@ pub struct DomainInfo {
     domain_end: String,
     domain_days: i64,
     last_checked: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FileInspection {
+    exists: bool,
+    size: u64,
+    sha256: Option<String>,
 }
 
 fn resolve_binary_path(app_handle: &tauri::AppHandle, file_name: &str) -> Result<PathBuf, String> {
@@ -96,12 +104,117 @@ fn escape_ffmpeg_concat_path(path: &str) -> String {
     path.replace('\\', "/").replace('\'', "'\\''")
 }
 
+fn run_command_output(command: &mut Command) -> Result<Output, std::io::Error> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+
+    command.output()
+}
+
+fn load_watermark_font() -> Result<ab_glyph::FontArc, String> {
+    let candidates = [
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\tahoma.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    ];
+
+    for candidate in candidates {
+        let path = PathBuf::from(candidate);
+        if !path.exists() {
+            continue;
+        }
+
+        if let Ok(font_bytes) = std::fs::read(&path) {
+            if let Ok(font) = ab_glyph::FontArc::try_from_vec(font_bytes) {
+                return Ok(font);
+            }
+        }
+    }
+
+    Err("Watermark icin uygun bir sistem fontu bulunamadi.".to_string())
+}
+
+fn apply_text_watermark(
+    image: image::DynamicImage,
+    text: &str,
+    position: &str,
+    opacity_percent: u8,
+) -> Result<image::DynamicImage, String> {
+    use image::Rgba;
+    use imageproc::drawing::{draw_text_mut, text_size};
+
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Ok(image);
+    }
+
+    let font = load_watermark_font()?;
+    let mut rgba_image = image.to_rgba8();
+    let width = rgba_image.width();
+    let height = rgba_image.height();
+    let min_side = width.min(height) as f32;
+    let margin = ((min_side / 25.0).round() as i32).max(12);
+    let scale = ab_glyph::PxScale::from((min_side / 14.0).clamp(18.0, 72.0));
+    let (text_width, text_height) = text_size(scale, &font, trimmed);
+    let text_width = text_width as i32;
+    let text_height = text_height as i32;
+    let x_max = (width as i32 - text_width - margin).max(margin);
+    let y_max = (height as i32 - text_height - margin).max(margin);
+
+    let (x, y) = match position {
+        "top-left" => (margin, margin),
+        "top-right" => (x_max, margin),
+        "bottom-left" => (margin, y_max),
+        "center" => (
+            ((width as i32 - text_width) / 2).max(margin),
+            ((height as i32 - text_height) / 2).max(margin),
+        ),
+        _ => (x_max, y_max),
+    };
+
+    let alpha = ((opacity_percent.min(100) as f32 / 100.0) * 255.0).round() as u8;
+    let shadow_alpha = alpha.saturating_sub(110).max(40);
+
+    draw_text_mut(
+        &mut rgba_image,
+        Rgba([0, 0, 0, shadow_alpha]),
+        x + 2,
+        y + 2,
+        scale,
+        &font,
+        trimmed,
+    );
+    draw_text_mut(
+        &mut rgba_image,
+        Rgba([255, 255, 255, alpha]),
+        x,
+        y,
+        scale,
+        &font,
+        trimmed,
+    );
+
+    Ok(image::DynamicImage::ImageRgba8(rgba_image))
+}
+
 #[tauri::command]
 async fn convert_image(
     file_path: String,
     output_format: String,
     output_dir: Option<String>,
     quality: Option<u8>,
+    watermark_text: Option<String>,
+    watermark_position: Option<String>,
+    watermark_opacity: Option<u8>,
     app_handle: tauri::AppHandle,
 ) -> Result<ConvertedImage, String> {
     use image::ImageFormat;
@@ -109,6 +222,12 @@ async fn convert_image(
     use uuid::Uuid;
 
     let img = image::open(&file_path).map_err(|e| format!("Resim acilamadi: {}", e))?;
+    let processed_img = apply_text_watermark(
+        img,
+        watermark_text.as_deref().unwrap_or(""),
+        watermark_position.as_deref().unwrap_or("bottom-right"),
+        watermark_opacity.unwrap_or(44),
+    )?;
 
     let output_path_base = if let Some(custom_dir) = output_dir {
         PathBuf::from(custom_dir)
@@ -166,7 +285,8 @@ async fn convert_image(
             };
 
             let encoder = PngEncoder::new_with_quality(file, compression, FilterType::Adaptive);
-            img.write_with_encoder(encoder)
+            processed_img
+                .write_with_encoder(encoder)
                 .map_err(|e| format!("PNG kaydedilemedi: {}", e))?;
         }
         "jpg" | "jpeg" => {
@@ -175,7 +295,7 @@ async fn convert_image(
             let file = fs::File::create(&output_path)
                 .map_err(|e| format!("Dosya olusturulamadi: {}", e))?;
             let mut encoder = JpegEncoder::new_with_quality(file, quality_value);
-            let rgb_img = img.to_rgb8();
+            let rgb_img = processed_img.to_rgb8();
 
             encoder
                 .encode(
@@ -189,7 +309,7 @@ async fn convert_image(
         "webp" => {
             use webp::Encoder;
 
-            let rgb_img = img.to_rgb8();
+            let rgb_img = processed_img.to_rgb8();
             let (width, height) = rgb_img.dimensions();
             let encoder = Encoder::from_rgb(&rgb_img, width, height);
             let webp_data = if quality_value >= 100 {
@@ -201,16 +321,16 @@ async fn convert_image(
             fs::write(&output_path, &*webp_data)
                 .map_err(|e| format!("WebP kaydedilemedi: {}", e))?;
         }
-        "gif" => img
+        "gif" => processed_img
             .save_with_format(&output_path, ImageFormat::Gif)
             .map_err(|e| format!("GIF kaydedilemedi: {}", e))?,
-        "bmp" => img
+        "bmp" => processed_img
             .save_with_format(&output_path, ImageFormat::Bmp)
             .map_err(|e| format!("BMP kaydedilemedi: {}", e))?,
-        "ico" => img
+        "ico" => processed_img
             .save_with_format(&output_path, ImageFormat::Ico)
             .map_err(|e| format!("ICO kaydedilemedi: {}", e))?,
-        "tiff" | "tif" => img
+        "tiff" | "tif" => processed_img
             .save_with_format(&output_path, ImageFormat::Tiff)
             .map_err(|e| format!("TIFF kaydedilemedi: {}", e))?,
         _ => return Err(format!("Desteklenmeyen format: {}", output_format)),
@@ -335,10 +455,62 @@ async fn get_image_data_url(file_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn inspect_file(
+    file_path: String,
+    compute_hash: Option<bool>,
+) -> Result<FileInspection, String> {
+    use sha2::{Digest, Sha256};
+    use std::fs;
+    use std::io::Read;
+
+    let path = PathBuf::from(&file_path);
+    if !path.exists() {
+        return Ok(FileInspection {
+            exists: false,
+            size: 0,
+            sha256: None,
+        });
+    }
+
+    let size = fs::metadata(&path)
+        .map(|metadata| metadata.len())
+        .map_err(|e| format!("Dosya bilgisi alinamadi: {}", e))?;
+
+    let sha256 = if compute_hash.unwrap_or(false) {
+        let mut file = fs::File::open(&path).map_err(|e| format!("Dosya acilamadi: {}", e))?;
+        let mut hasher = Sha256::new();
+        let mut buffer = [0_u8; 1024 * 64];
+
+        loop {
+            let read_count = file
+                .read(&mut buffer)
+                .map_err(|e| format!("Dosya okunamadi: {}", e))?;
+            if read_count == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read_count]);
+        }
+
+        Some(format!("{:x}", hasher.finalize()))
+    } else {
+        None
+    };
+
+    Ok(FileInspection {
+        exists: true,
+        size,
+        sha256,
+    })
+}
+
+#[tauri::command]
 async fn optimize_video(
     file_path: String,
     output_dir: Option<String>,
     quality: Option<String>,
+    trim_start: Option<String>,
+    trim_end: Option<String>,
+    normalize_audio: Option<bool>,
     app_handle: tauri::AppHandle,
 ) -> Result<ConvertedVideo, String> {
     use std::fs;
@@ -388,16 +560,37 @@ async fn optimize_video(
         _ => ("23", "medium", "film"),
     };
 
-    let mut args = vec![
-        "-i".to_string(),
-        file_path.clone(),
+    let mut args = vec!["-y".to_string()];
+
+    if let Some(start) = trim_start
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        args.push("-ss".to_string());
+        args.push(start.to_string());
+    }
+
+    args.push("-i".to_string());
+    args.push(file_path.clone());
+
+    if let Some(end) = trim_end
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        args.push("-to".to_string());
+        args.push(end.to_string());
+    }
+
+    args.extend_from_slice(&[
         "-c:v".to_string(),
         "libx264".to_string(),
         "-crf".to_string(),
         crf.to_string(),
         "-preset".to_string(),
         preset.to_string(),
-    ];
+    ]);
 
     if !tune.is_empty() {
         args.push("-tune".to_string());
@@ -421,13 +614,15 @@ async fn optimize_video(
         "+faststart".to_string(),
         "-max_muxing_queue_size".to_string(),
         "1024".to_string(),
-        "-y".to_string(),
-        output_path_str.clone(),
     ]);
 
-    let output = Command::new(&ffmpeg_path)
-        .args(&args)
-        .output()
+    if normalize_audio.unwrap_or(false) {
+        args.extend_from_slice(&["-af".to_string(), "loudnorm".to_string()]);
+    }
+
+    args.push(output_path_str.clone());
+
+    let output = run_command_output(Command::new(&ffmpeg_path).args(&args))
         .map_err(|e| format!("FFmpeg calistirilamadi: {}", e))?;
 
     if !output.status.success() {
@@ -439,18 +634,16 @@ async fn optimize_video(
         .map(|metadata| metadata.len())
         .unwrap_or(0);
 
-    let duration_output = Command::new(&ffprobe_path)
-        .args(&[
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            output_path_str.as_str(),
-        ])
-        .output()
-        .ok();
+    let duration_output = run_command_output(Command::new(&ffprobe_path).args(&[
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        output_path_str.as_str(),
+    ]))
+    .ok();
 
     let duration = if let Some(output) = duration_output {
         let duration_text = String::from_utf8_lossy(&output.stdout);
@@ -503,23 +696,21 @@ async fn get_video_thumbnail(
         .ok_or_else(|| "Gecersiz thumbnail path".to_string())?
         .to_string();
 
-    let output = Command::new(&ffmpeg_path)
-        .args(&[
-            "-ss",
-            "0",
-            "-i",
-            file_path.as_str(),
-            "-vframes",
-            "1",
-            "-vf",
-            "thumbnail,scale=320:-1",
-            "-q:v",
-            "2",
-            "-y",
-            thumbnail_path_str.as_str(),
-        ])
-        .output()
-        .map_err(|e| format!("FFmpeg calistirilamadi: {}", e))?;
+    let output = run_command_output(Command::new(&ffmpeg_path).args(&[
+        "-ss",
+        "0",
+        "-i",
+        file_path.as_str(),
+        "-vframes",
+        "1",
+        "-vf",
+        "thumbnail,scale=320:-1",
+        "-q:v",
+        "2",
+        "-y",
+        thumbnail_path_str.as_str(),
+    ]))
+    .map_err(|e| format!("FFmpeg calistirilamadi: {}", e))?;
 
     if !output.status.success() {
         let error = String::from_utf8_lossy(&output.stderr);
@@ -588,41 +779,39 @@ async fn merge_videos(
     }
     drop(concat_file);
 
-    let output = Command::new(&ffmpeg_path)
-        .args(&[
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            concat_file_path_str.as_str(),
-            "-c:v",
-            "libx264",
-            "-crf",
-            "18",
-            "-preset",
-            "medium",
-            "-profile:v",
-            "high",
-            "-level",
-            "4.1",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "192k",
-            "-ar",
-            "48000",
-            "-movflags",
-            "+faststart",
-            "-max_muxing_queue_size",
-            "1024",
-            "-y",
-            output_path_str.as_str(),
-        ])
-        .output()
-        .map_err(|e| format!("FFmpeg calistirilamadi: {}", e))?;
+    let output = run_command_output(Command::new(&ffmpeg_path).args(&[
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        concat_file_path_str.as_str(),
+        "-c:v",
+        "libx264",
+        "-crf",
+        "18",
+        "-preset",
+        "medium",
+        "-profile:v",
+        "high",
+        "-level",
+        "4.1",
+        "-pix_fmt",
+        "yuv420p",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "192k",
+        "-ar",
+        "48000",
+        "-movflags",
+        "+faststart",
+        "-max_muxing_queue_size",
+        "1024",
+        "-y",
+        output_path_str.as_str(),
+    ]))
+    .map_err(|e| format!("FFmpeg calistirilamadi: {}", e))?;
 
     let _ = fs::remove_file(&concat_file_path);
 
@@ -635,18 +824,16 @@ async fn merge_videos(
         .map(|metadata| metadata.len())
         .unwrap_or(0);
 
-    let duration_output = Command::new(&ffprobe_path)
-        .args(&[
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "default=noprint_wrappers=1:nokey=1",
-            output_path_str.as_str(),
-        ])
-        .output()
-        .ok();
+    let duration_output = run_command_output(Command::new(&ffprobe_path).args(&[
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
+        output_path_str.as_str(),
+    ]))
+    .ok();
 
     let duration = if let Some(output) = duration_output {
         let duration_text = String::from_utf8_lossy(&output.stdout);
@@ -919,6 +1106,7 @@ pub fn run() {
             get_default_output_path,
             get_database_path,
             get_image_data_url,
+            inspect_file,
             optimize_video,
             merge_videos,
             get_video_thumbnail,

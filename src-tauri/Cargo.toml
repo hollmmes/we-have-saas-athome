@@ -1,6 +1,6 @@
 [package]
 name = "we-have-saas-athome"
-version = "0.6.0"
+version = "0.7.0"
 description = "We Have SaaS at Home by hollmmes"
 authors = ["hollmmes"]
 license = "GPL-3.0"
@@ -29,10 +29,13 @@ tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = "0.25"
+imageproc = "0.25"
+ab_glyph = "0.2"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 base64 = "0.22"
 webp = "0.3"
+sha2 = "0.10"
 tokio = { version = "1", features = ["process", "io-util", "net", "time"] }
 native-tls = "0.2"
 x509-parser = "0.16"

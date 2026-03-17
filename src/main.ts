@@ -21,8 +21,12 @@ import { setupMonitorPage, loadDomains } from "./pages/monitor";
 import { setupArchivePage, loadArchive } from "./pages/archive";
 import { setupDatabasePage, loadDatabaseStats } from "./pages/database";
 import { handleHexFinderPaths, setupHexFinderPage } from "./pages/hex-finder";
+import { setupWorkflowCenterPage } from "./pages/workflow-center";
+import { initWorkflowState } from "./workflow";
 
 window.addEventListener("DOMContentLoaded", async () => {
+  initWorkflowState();
+
   // Initialize database
   await initDatabase();
 
@@ -723,6 +727,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     setupMonitorPage();
     setupArchivePage();
     setupDatabasePage();
+    setupWorkflowCenterPage();
 
     // Setup file drop handling
     await setupFileDrop(handleFilePaths, async (paths: string[]) => {

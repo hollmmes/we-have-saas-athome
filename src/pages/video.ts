@@ -1,5 +1,5 @@
 import { saveVideo, getVideos } from '../database';
-import type { ConvertedVideo } from '../types';
+import type { ConvertedVideo, VideoPreset, WatchFolder } from '../types';
 import {
   ensureOutputSubfolder,
   escapeAttribute,
@@ -11,11 +11,33 @@ import {
   uniqueStrings
 } from '../utils/helpers';
 import { initIcons } from '../utils/icons';
+import {
+  completeQueueJob,
+  createPresetId,
+  createQueueJob,
+  createRetryPayload,
+  failQueueJob,
+  getActiveProfile,
+  getPresets,
+  notifyApp,
+  registerRetryHandler,
+  registerWatchProcessor,
+  savePreset,
+  subscribeWorkflowChanges,
+} from '../workflow';
+
+type VideoProcessingOptions = {
+  trimStart: string;
+  trimEnd: string;
+  normalizeAudio: boolean;
+};
 
 let selectedVideos: string[] = [];
 let mergeVideos: string[] = [];
 
 export function setupVideoPage() {
+  ensureVideoWorkflowUi();
+  bindVideoToolbarControls();
   const tabBtns = document.querySelectorAll('.tab-btn');
   const tabContents = document.querySelectorAll('.tab-content');
   const videoDropZone = document.getElementById('videoDropZone')!;
@@ -24,6 +46,9 @@ export function setupVideoPage() {
   const mergeListContainer = document.getElementById('mergeList')!;
   const videoResultsGrid = document.getElementById('videoResultsGrid')!;
   const mergeVideosBtn = document.getElementById('mergeVideosBtn')!;
+  const presetSelect = document.getElementById('videoPresetSelect') as HTMLSelectElement | null;
+  const applyPresetBtn = document.getElementById('applyVideoPresetBtn');
+  const savePresetBtn = document.getElementById('saveVideoPresetBtn');
 
   tabBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -120,18 +145,62 @@ export function setupVideoPage() {
 
   videoResultsGrid.addEventListener('click', async (event) => {
     const actionButton = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-open-path]');
-    if (actionButton.dataset.openPath) {
+    if (actionButton?.dataset.openPath) {
       await openFileLocation(actionButton.dataset.openPath);
       return;
     }
 
     const preview = (event.target as HTMLElement).closest<HTMLElement>('[data-play-path]');
-    if (preview.dataset.playPath && preview.dataset.playName) {
+    if (preview?.dataset.playPath && preview.dataset.playName) {
       await playVideo(preview.dataset.playPath, preview.dataset.playName);
     }
   });
 
   mergeVideosBtn.addEventListener('click', handleMergeVideos);
+
+  applyPresetBtn?.addEventListener('click', () => {
+    const preset = resolveVideoPreset(presetSelect?.value || '');
+    if (!preset) {
+      return;
+    }
+
+    applyPresetToSelection(preset);
+    applyVideoToolbarState(preset);
+    notifyApp('info', `Applied video preset: ${preset.name}`);
+  });
+
+  savePresetBtn?.addEventListener('click', saveCurrentVideoPreset);
+
+  registerRetryHandler('video-optimize', async (payload) => {
+    const retry = payload as { filePath: string; quality: string; options: VideoProcessingOptions };
+    await optimizeVideo(retry.filePath, retry.quality, retry.options);
+  });
+
+  registerRetryHandler('video-merge', async (payload) => {
+    const retry = payload as { filePaths: string[] };
+    const previousMergeVideos = [...mergeVideos];
+    mergeVideos = [...retry.filePaths];
+    try {
+      await handleMergeVideos();
+    } finally {
+      mergeVideos = previousMergeVideos;
+      renderMergeList();
+    }
+  });
+
+  registerWatchProcessor('video', async (paths, folder) => {
+    await processVideoWatchFolder(paths, folder);
+  });
+
+  const unsubscribe = subscribeWorkflowChanges((section) => {
+    if (section === 'presets' || section === 'profiles') {
+      populateVideoPresetSelect();
+    }
+  });
+
+  window.addEventListener('beforeunload', unsubscribe, { once: true });
+  populateVideoPresetSelect();
+  syncVideoToolbarFromPreset();
 
   void loadRecentVideos();
 }
@@ -148,6 +217,11 @@ export function addVideosToSelection(paths: string[]) {
 
   selectedVideos = uniqueStrings([...selectedVideos, ...validPaths]);
   renderSelectedVideos();
+  const preset = getDefaultVideoPreset();
+  if (preset) {
+    applyPresetToSelection(preset);
+    applyVideoToolbarState(preset);
+  }
 }
 
 export function addVideosToMerge(paths: string[]) {
@@ -273,6 +347,11 @@ async function optimizeAllVideos() {
     return;
   }
 
+  const options = getCurrentVideoProcessingOptions();
+  if (!validateVideoProcessingOptions(options)) {
+    return;
+  }
+
   const fileItems = selectedVideosContainer.querySelectorAll('.selected-file-item');
 
   for (let index = 0; index < selectedVideos.length; index += 1) {
@@ -281,23 +360,41 @@ async function optimizeAllVideos() {
     const qualitySelect = fileItem.querySelector<HTMLSelectElement>('.format-select');
     const quality = qualitySelect.value || 'medium';
 
-    await optimizeVideo(filePath, quality);
+    await optimizeVideo(filePath, quality, options);
   }
 
   clearSelectedVideos();
 }
 
-async function optimizeVideo(filePath: string, quality: string) {
+async function optimizeVideo(filePath: string, quality: string, options = getCurrentVideoProcessingOptions()) {
   const { invoke } = await import('@tauri-apps/api/core');
   const videoQueue = document.getElementById('videoQueue');
+  if (!videoQueue) {
+    return;
+  }
+
   const fileName = fileNameFromPath(filePath);
+  const trimLabel = options.trimStart || options.trimEnd
+    ? `${options.trimStart || '00:00'} -> ${options.trimEnd || 'end'}`
+    : 'full';
+  const job = createQueueJob({
+    tool: 'video',
+    action: 'optimize',
+    title: `Video optimize: ${fileName}`,
+    inputPaths: [filePath],
+    message: `Running ${quality} quality optimization`,
+    retryKey: 'video-optimize',
+    retryPayload: createRetryPayload({ filePath, quality, options })
+  });
 
   const queueItem = document.createElement('div');
   queueItem.className = 'queue-item';
   queueItem.innerHTML = `
     <div class="queue-item-info">
       <span class="queue-item-name">${escapeHtml(fileName)}</span>
-      <span class="queue-item-status">Optimize ediliyor... (${escapeHtml(quality)})</span>
+      <span class="queue-item-status">
+        Optimize ediliyor... (${escapeHtml(quality)}, Trim: ${escapeHtml(trimLabel)}, Audio: ${options.normalizeAudio ? 'normalized' : 'original'})
+      </span>
     </div>
     <div class="queue-item-progress">
       <div class="progress-bar"></div>
@@ -310,14 +407,29 @@ async function optimizeVideo(filePath: string, quality: string) {
     const result = await invoke<ConvertedVideo>('optimize_video', {
       filePath,
       outputDir,
-      quality
+      quality,
+      trimStart: options.trimStart || null,
+      trimEnd: options.trimEnd || null,
+      normalizeAudio: options.normalizeAudio
     });
 
     await saveVideo(result);
     queueItem.querySelector('.queue-item-status')!.textContent = `Tamamlandi! (${result.duration})`;
     queueItem.classList.add('success');
+    completeQueueJob(job.id, {
+      outputPaths: [result.output_path],
+      message: `Completed optimization in ${result.duration}`,
+      metrics: {
+        quality,
+        duration: result.duration,
+        size: formatFileSize(result.file_size),
+        trim: trimLabel,
+        audio: options.normalizeAudio ? 'normalized' : 'original',
+      },
+    });
 
     await loadRecentVideos();
+    await renderVideoCompareCard(filePath, result, quality, options);
 
     setTimeout(() => {
       queueItem.remove();
@@ -326,6 +438,7 @@ async function optimizeVideo(filePath: string, quality: string) {
     console.error('Video optimization error:', error);
     queueItem.querySelector('.queue-item-status')!.textContent = `Hata: ${String(error)}`;
     queueItem.classList.add('error');
+    failQueueJob(job.id, String(error));
   }
 }
 
@@ -339,6 +452,15 @@ async function handleMergeVideos() {
   const mergeQueue = document.getElementById('mergeQueue');
 
   const queueItem = document.createElement('div');
+  const job = createQueueJob({
+    tool: 'video',
+    action: 'merge',
+    title: `Video merge (${mergeVideos.length} files)`,
+    inputPaths: [...mergeVideos],
+    message: `Merging ${mergeVideos.length} file(s)`,
+    retryKey: 'video-merge',
+    retryPayload: createRetryPayload({ filePaths: mergeVideos })
+  });
   queueItem.className = 'queue-item';
   queueItem.innerHTML = `
     <div class="queue-item-info">
@@ -361,6 +483,15 @@ async function handleMergeVideos() {
     await saveVideo(result);
     queueItem.querySelector('.queue-item-status')!.textContent = `Tamamlandi! (${result.duration})`;
     queueItem.classList.add('success');
+    completeQueueJob(job.id, {
+      outputPaths: [result.output_path],
+      message: `Merged video ready (${result.duration})`,
+      metrics: {
+        files: String(mergeVideos.length),
+        duration: result.duration,
+        size: formatFileSize(result.file_size),
+      },
+    });
 
     clearMergeVideos();
     await loadRecentVideos();
@@ -372,6 +503,7 @@ async function handleMergeVideos() {
     console.error('Video merge error:', error);
     queueItem.querySelector('.queue-item-status')!.textContent = `Hata: ${String(error)}`;
     queueItem.classList.add('error');
+    failQueueJob(job.id, String(error));
   }
 }
 
@@ -480,4 +612,312 @@ async function playVideo(filePath: string, fileName: string) {
       modal.remove();
     }
   });
+}
+
+function ensureVideoWorkflowUi() {
+  const contentWrapper = document.querySelector('#videoPage .content-wrapper');
+  const videoContainer = document.querySelector('#videoPage .video-container');
+  if (!contentWrapper || !videoContainer) {
+    return;
+  }
+
+  if (!document.getElementById('videoPresetSelect')) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'tool-toolbar';
+    toolbar.innerHTML = `
+      <div class="tool-toolbar-group">
+        <label for="videoPresetSelect">Preset</label>
+        <select id="videoPresetSelect" class="tool-select"></select>
+        <button class="btn-secondary btn-sm" id="applyVideoPresetBtn" type="button">Apply</button>
+        <button class="btn-secondary btn-sm" id="saveVideoPresetBtn" type="button">Save Preset</button>
+      </div>
+      <div class="tool-toolbar-group">
+        <input id="videoTrimStart" class="monitor-input tool-input-compact" type="text" placeholder="Trim start 00:00">
+        <input id="videoTrimEnd" class="monitor-input tool-input-compact" type="text" placeholder="Trim end 00:30">
+        <label class="tool-checkbox">
+          <input id="videoNormalizeAudio" type="checkbox">
+          <span>Normalize audio</span>
+        </label>
+        <button class="btn-secondary btn-sm" id="resetVideoProcessingBtn" type="button">Reset</button>
+      </div>
+      <div class="tool-toolbar-group tool-toolbar-note">
+        <span>Optimization queue, trim, retry and watch folders are active.</span>
+      </div>
+    `;
+
+    contentWrapper.insertBefore(toolbar, videoContainer);
+  }
+
+  if (!document.getElementById('videoComparePanel')) {
+    const comparePanel = document.createElement('div');
+    comparePanel.id = 'videoComparePanel';
+    comparePanel.className = 'compare-panel';
+    comparePanel.innerHTML = `
+      <div class="compare-panel-header">
+        <h3>Video Compare</h3>
+        <p>Recent optimization metrics appear here.</p>
+      </div>
+      <div class="compare-panel-grid" id="videoCompareGrid"></div>
+    `;
+
+    videoContainer.appendChild(comparePanel);
+  }
+}
+
+function populateVideoPresetSelect() {
+  const select = document.getElementById('videoPresetSelect') as HTMLSelectElement | null;
+  if (!select) {
+    return;
+  }
+
+  const presets = getPresets('video');
+  const activePreset = getDefaultVideoPreset();
+
+  select.innerHTML = presets
+    .map((preset) => `
+      <option value="${escapeAttribute(preset.id)}" ${preset.id === activePreset?.id ? 'selected' : ''}>
+        ${escapeHtml(preset.name)} - ${escapeHtml(preset.quality)}
+      </option>
+    `)
+    .join('');
+}
+
+function getDefaultVideoPreset() {
+  const activeProfile = getActiveProfile();
+  const presets = getPresets('video');
+  return presets.find((preset) => preset.id === activeProfile?.videoPresetId) || presets[0] || null;
+}
+
+function resolveVideoPreset(presetId: string) {
+  return getPresets('video').find((preset) => preset.id === presetId) || getDefaultVideoPreset();
+}
+
+function applyPresetToSelection(preset: VideoPreset) {
+  document.querySelectorAll<HTMLElement>('#selectedVideos .selected-file-item').forEach((item) => {
+    const qualitySelect = item.querySelector<HTMLSelectElement>('.format-select');
+    if (qualitySelect) {
+      qualitySelect.value = preset.quality;
+    }
+  });
+}
+
+function applyVideoToolbarState(preset: VideoPreset) {
+  const trimStart = document.getElementById('videoTrimStart') as HTMLInputElement | null;
+  const trimEnd = document.getElementById('videoTrimEnd') as HTMLInputElement | null;
+  const normalizeAudio = document.getElementById('videoNormalizeAudio') as HTMLInputElement | null;
+
+  if (trimStart) {
+    trimStart.value = preset.trimStart || '';
+  }
+
+  if (trimEnd) {
+    trimEnd.value = preset.trimEnd || '';
+  }
+
+  if (normalizeAudio) {
+    normalizeAudio.checked = preset.normalizeAudio ?? false;
+  }
+}
+
+function syncVideoToolbarFromPreset() {
+  const preset = getDefaultVideoPreset();
+  if (preset) {
+    applyVideoToolbarState(preset);
+  }
+}
+
+function bindVideoToolbarControls() {
+  const toolbar = document.getElementById('videoPresetSelect')?.closest('.tool-toolbar');
+  if (!toolbar || toolbar.getAttribute('data-video-toolbar-bound') === 'true') {
+    return;
+  }
+
+  toolbar.setAttribute('data-video-toolbar-bound', 'true');
+
+  const resetButton = document.getElementById('resetVideoProcessingBtn');
+  resetButton?.addEventListener('click', () => {
+    const trimStart = document.getElementById('videoTrimStart') as HTMLInputElement | null;
+    const trimEnd = document.getElementById('videoTrimEnd') as HTMLInputElement | null;
+    const normalizeAudio = document.getElementById('videoNormalizeAudio') as HTMLInputElement | null;
+
+    if (trimStart) {
+      trimStart.value = '';
+    }
+
+    if (trimEnd) {
+      trimEnd.value = '';
+    }
+
+    if (normalizeAudio) {
+      normalizeAudio.checked = false;
+    }
+  });
+}
+
+function getCurrentVideoProcessingOptions(): VideoProcessingOptions {
+  return {
+    trimStart: (document.getElementById('videoTrimStart') as HTMLInputElement | null)?.value.trim() || '',
+    trimEnd: (document.getElementById('videoTrimEnd') as HTMLInputElement | null)?.value.trim() || '',
+    normalizeAudio: (document.getElementById('videoNormalizeAudio') as HTMLInputElement | null)?.checked ?? false,
+  };
+}
+
+function parseTimecodeToSeconds(value: string): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const parts = value.split(':').map((part) => Number.parseFloat(part));
+  if (parts.some((part) => Number.isNaN(part) || part < 0)) {
+    return null;
+  }
+
+  if (parts.length === 1) {
+    return parts[0];
+  }
+
+  if (parts.length === 2) {
+    return parts[0] * 60 + parts[1];
+  }
+
+  if (parts.length === 3) {
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+
+  return null;
+}
+
+function validateVideoProcessingOptions(options: VideoProcessingOptions): boolean {
+  const startSeconds = parseTimecodeToSeconds(options.trimStart);
+  const endSeconds = parseTimecodeToSeconds(options.trimEnd);
+
+  if (options.trimStart && startSeconds === null) {
+    alert('Trim start must be a valid timecode like 00:12 or 00:00:12.');
+    return false;
+  }
+
+  if (options.trimEnd && endSeconds === null) {
+    alert('Trim end must be a valid timecode like 00:30 or 00:00:30.');
+    return false;
+  }
+
+  if (startSeconds !== null && endSeconds !== null && endSeconds <= startSeconds) {
+    alert('Trim end must be greater than trim start.');
+    return false;
+  }
+
+  return true;
+}
+
+function saveCurrentVideoPreset() {
+  const selectedVideosContainer = document.getElementById('selectedVideos');
+  const firstItem = selectedVideosContainer?.querySelector<HTMLElement>('.selected-file-item');
+  const quality = firstItem?.querySelector<HTMLSelectElement>('.format-select')?.value || 'medium';
+  const options = getCurrentVideoProcessingOptions();
+  const presetName = window.prompt('Preset name', `Video ${quality}`);
+
+  if (!presetName) {
+    return;
+  }
+
+  savePreset({
+    id: createPresetId('video'),
+    type: 'video',
+    name: presetName.trim(),
+    quality,
+    mode: 'optimize',
+    suffix: quality,
+    trimStart: options.trimStart,
+    trimEnd: options.trimEnd,
+    normalizeAudio: options.normalizeAudio,
+  });
+
+  populateVideoPresetSelect();
+  notifyApp('success', `Saved video preset: ${presetName.trim()}`);
+}
+
+async function renderVideoCompareCard(
+  filePath: string,
+  result: ConvertedVideo,
+  quality: string,
+  options: VideoProcessingOptions
+) {
+  const compareGrid = document.getElementById('videoCompareGrid');
+  if (!compareGrid) {
+    return;
+  }
+
+  const fs = await import('@tauri-apps/plugin-fs');
+  let originalSize = 0;
+  try {
+    const stat = await fs.stat(filePath);
+    originalSize = stat.size || 0;
+  } catch (error) {
+    console.error('Video stat error:', error);
+  }
+
+  const savedPercent = originalSize > 0
+    ? `${Math.round((1 - result.file_size / originalSize) * 100)}%`
+    : 'n/a';
+
+  const card = document.createElement('article');
+  card.className = 'compare-card compare-card-compact';
+  card.innerHTML = `
+    <div class="compare-card-header">
+      <h4>${escapeHtml(result.converted_name)}</h4>
+      <span>${escapeHtml(quality)}</span>
+    </div>
+    <div class="compare-card-metrics">
+      <span>Original: ${formatFileSize(originalSize)}</span>
+      <span>Output: ${formatFileSize(result.file_size)}</span>
+      <span>Saved: ${escapeHtml(savedPercent)}</span>
+      <span>Duration: ${escapeHtml(result.duration)}</span>
+      <span>Trim: ${escapeHtml(options.trimStart || options.trimEnd ? `${options.trimStart || '00:00'} -> ${options.trimEnd || 'end'}` : 'full')}</span>
+      <span>Audio: ${options.normalizeAudio ? 'normalized' : 'original'}</span>
+    </div>
+    <div class="compare-card-actions">
+      <button class="btn-secondary btn-sm" data-open-original="${escapeAttribute(filePath)}" type="button">Open source</button>
+      <button class="btn-secondary btn-sm" data-open-output="${escapeAttribute(result.output_path)}" type="button">Open output</button>
+    </div>
+  `;
+
+  card.querySelector<HTMLButtonElement>('[data-open-original]')?.addEventListener('click', async () => {
+    await openFileLocation(filePath);
+  });
+
+  card.querySelector<HTMLButtonElement>('[data-open-output]')?.addEventListener('click', async () => {
+    await openFileLocation(result.output_path);
+  });
+
+  compareGrid.prepend(card);
+  while (compareGrid.children.length > 4) {
+    compareGrid.lastElementChild?.remove();
+  }
+}
+
+async function processVideoWatchFolder(paths: string[], folder: WatchFolder) {
+  const preset = resolveVideoPreset(folder.presetId);
+  if (folder.behavior === 'import') {
+    addVideosToSelection(paths);
+    if (preset) {
+      applyPresetToSelection(preset);
+      applyVideoToolbarState(preset);
+    }
+    notifyApp('info', `${folder.name} imported ${paths.length} video file(s).`);
+    return;
+  }
+
+  const options: VideoProcessingOptions = {
+    trimStart: preset?.trimStart || '',
+    trimEnd: preset?.trimEnd || '',
+    normalizeAudio: preset?.normalizeAudio ?? false,
+  };
+
+  if (!validateVideoProcessingOptions(options)) {
+    return;
+  }
+
+  for (const filePath of paths) {
+    await optimizeVideo(filePath, preset?.quality || 'medium', options);
+  }
 }
