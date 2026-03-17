@@ -1,4 +1,4 @@
-import { createIcons, Home, Info, CheckCircle, Download, Menu, Image, Archive, Trash2, FolderOpen, Settings, Video, Plus, Play, Hash, Maximize, Monitor, Crop, Database, HardDrive, Table, RefreshCw, Folder } from 'lucide';
+import { createIcons, Home, Info, CheckCircle, Download, Menu, Image, Archive, Trash2, FolderOpen, Settings, Video, Plus, Play, Hash, Maximize, Monitor, Crop, Database, HardDrive, Table, RefreshCw, Folder, Pipette, Palette, PanelLeftClose, PanelLeftOpen } from 'lucide';
 
 const allIcons = {
   Home,
@@ -22,7 +22,11 @@ const allIcons = {
   HardDrive,
   Table,
   RefreshCw,
-  Folder
+  Folder,
+  Pipette,
+  Palette,
+  PanelLeftClose,
+  PanelLeftOpen
 };
 
 export function initIcons() {

@@ -1,156 +1,199 @@
-import { getAllMedia, deleteImage as deleteImageFromDB, deleteVideo as deleteVideoFromDB } from '../database';
-import { formatFileSize } from '../utils/helpers';
+import { deleteImage as deleteImageFromDB, deleteVideo as deleteVideoFromDB, getAllMedia } from '../database';
+import type { MediaRecord } from '../types';
+import { escapeAttribute, escapeHtml, formatFileSize } from '../utils/helpers';
 import { initIcons } from '../utils/icons';
 
+const SELECTION_SEPARATOR = '::';
 let selectedMedia: Set<string> = new Set();
 
 export function setupArchivePage() {
-  // Make functions global for onclick handlers
-  (window as any).toggleSelection = toggleSelection;
+  const archiveList = document.getElementById('archiveList')!;
+  const deleteSelectedBtn = document.getElementById('deleteSelectedBtn')!;
+  const cancelSelectionBtn = document.getElementById('cancelSelectionBtn')!;
+
+  archiveList.addEventListener('change', (event) => {
+    const target = event.target as HTMLInputElement;
+    if (!target.matches('input[data-media-id][data-media-type]')) {
+      return;
+    }
+
+    const id = target.dataset.mediaId;
+    const type = target.dataset.mediaType as MediaRecord['type'] | undefined;
+
+    if (id && type) {
+      toggleSelection(id, type);
+    }
+  });
+
+  archiveList.addEventListener('click', async (event) => {
+    const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-delete-id][data-delete-type]');
+    if (!target) {
+      return;
+    }
+
+    const id = target.dataset.deleteId;
+    const type = target.dataset.deleteType as MediaRecord['type'] | undefined;
+
+    if (id && type) {
+      await deleteMediaHandler(id, type);
+    }
+  });
+
+  deleteSelectedBtn.addEventListener('click', handleDeleteSelected);
+  cancelSelectionBtn.addEventListener('click', handleCancelSelection);
+}
+
+function buildSelectionKey(id: string, type: MediaRecord['type']): string {
+  return `${type}${SELECTION_SEPARATOR}${id}`;
+}
+
+function parseSelectionKey(key: string): { type: MediaRecord['type']; id: string } {
+  const separatorIndex = key.indexOf(SELECTION_SEPARATOR);
+  if (separatorIndex === -1) {
+    throw new Error(`Gecersiz secim anahtari: ${key}`);
+  }
+
+  return {
+    type: key.slice(0, separatorIndex) as MediaRecord['type'],
+    id: key.slice(separatorIndex + SELECTION_SEPARATOR.length)
+  };
+}
+
+async function removeMediaRecord(media: MediaRecord): Promise<void> {
+  const { invoke } = await import('@tauri-apps/api/core');
+
+  if (media.type === 'image') {
+    await invoke('delete_converted_image', { id: media.id, filePath: media.output_path });
+    await deleteImageFromDB(media.id);
+    return;
+  }
+
+  await invoke('delete_converted_video', { id: media.id, filePath: media.output_path });
+  await deleteVideoFromDB(media.id);
 }
 
 export async function loadArchive() {
-  const archiveList = document.getElementById('archiveList');
+  const archiveList = document.getElementById('archiveList')!;
   if (!archiveList) return;
 
   try {
     const allMedia = await getAllMedia();
-    
+
     if (allMedia.length === 0) {
-      archiveList.innerHTML = '<p class="empty-message">Henüz dönüştürülmüş dosya yok</p>';
+      archiveList.innerHTML = '<p class="empty-message">Henuz donusturulmus dosya yok</p>';
+      updateSelectionUI();
       return;
     }
 
     const { invoke } = await import('@tauri-apps/api/core');
-    
-    const mediaPromises = allMedia.map(async (item: any) => {
-      if (item.type === 'image') {
-        try {
-          const dataUrl = await invoke('get_image_data_url', { filePath: item.output_path }) as string;
-          return { ...item, preview: dataUrl };
-        } catch (error) {
-          console.error('Failed to load image:', item.output_path, error);
-          return { ...item, preview: '' };
+    const mediaWithPreviews = await Promise.all(
+      allMedia.map(async (item) => {
+        if (item.type === 'image') {
+          try {
+            const preview = await invoke<string>('get_image_data_url', { filePath: item.output_path });
+            return { ...item, preview };
+          } catch (error) {
+            console.error('Failed to load image:', item.output_path, error);
+            return { ...item, preview: '' };
+          }
         }
-      } else {
+
         try {
-          const thumbnail = await invoke('get_video_thumbnail', { filePath: item.output_path }) as string;
-          return { ...item, preview: thumbnail };
+          const preview = await invoke<string>('get_video_thumbnail', { filePath: item.output_path });
+          return { ...item, preview };
         } catch (error) {
           console.error('Failed to load thumbnail:', item.output_path, error);
           return { ...item, preview: '' };
         }
-      }
-    });
-    
-    const mediaWithPreviews = await Promise.all(mediaPromises);
-    
-    archiveList.innerHTML = mediaWithPreviews.map(item => {
-      const isSelected = selectedMedia.has(`${item.type}-${item.id}`);
-      
-      return `
-        <div class="archive-item ${isSelected ? 'selected' : ''}" data-id="${item.id}" data-type="${item.type}">
-          <div class="archive-checkbox">
-            <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelection('${item.id}', '${item.type}')">
-          </div>
-          <div class="archive-preview">
-            ${item.preview ? `<img src="${item.preview}" alt="${item.converted_name}" />` : ''}
-            ${item.type === 'video' ? '<i data-lucide="play" class="play-icon"></i>' : ''}
-          </div>
-          <div class="archive-info">
-            <h4>${item.converted_name}</h4>
-            <p class="archive-meta">
-              <span class="archive-format">${item.type === 'image' ? item.converted_format : 'MP4'}</span>
-              <span class="archive-size">${formatFileSize(item.file_size)}</span>
-              <span class="archive-date">${item.created_at}</span>
-            </p>
-          </div>
-          <div class="archive-actions">
-            <button class="btn-danger btn-sm" data-id="${item.id}" data-type="${item.type}">Sil</button>
-          </div>
-        </div>
-      `;
-    }).join('');
+      })
+    );
 
-    // Add event listeners to delete buttons
-    const deleteButtons = archiveList.querySelectorAll('.archive-actions .btn-danger');
-    deleteButtons.forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const target = e.currentTarget as HTMLElement;
-        const id = target.getAttribute('data-id');
-        const type = target.getAttribute('data-type');
-        if (id && type) {
-          await deleteMediaHandler(id, type);
-        }
-      });
-    });
+    archiveList.innerHTML = mediaWithPreviews
+      .map((item) => {
+        const isSelected = selectedMedia.has(buildSelectionKey(item.id, item.type));
+        return `
+          <div class="archive-item ${isSelected ? 'selected' : ''}" data-id="${escapeAttribute(item.id)}" data-type="${item.type}">
+            <div class="archive-checkbox">
+              <input
+                type="checkbox"
+                data-media-id="${escapeAttribute(item.id)}"
+                data-media-type="${item.type}"
+                ${isSelected ? 'checked' : ''}
+              >
+            </div>
+            <div class="archive-preview">
+              ${item.preview ? `<img src="${escapeAttribute(item.preview)}" alt="${escapeAttribute(item.converted_name)}" />` : ''}
+              ${item.type === 'video' ? '<i data-lucide="play" class="play-icon"></i>' : ''}
+            </div>
+            <div class="archive-info">
+              <h4>${escapeHtml(item.converted_name)}</h4>
+              <p class="archive-meta">
+                <span class="archive-format">${escapeHtml(item.type === 'image' ? item.converted_format : 'MP4')}</span>
+                <span class="archive-size">${formatFileSize(item.file_size)}</span>
+                <span class="archive-date">${escapeHtml(item.created_at)}</span>
+              </p>
+            </div>
+            <div class="archive-actions">
+              <button class="btn-danger btn-sm" data-delete-id="${escapeAttribute(item.id)}" data-delete-type="${item.type}">Sil</button>
+            </div>
+          </div>
+        `;
+      })
+      .join('');
 
     initIcons();
     updateSelectionUI();
   } catch (error) {
     console.error('Archive load error:', error);
-    archiveList.innerHTML = '<p class="empty-message">Arşiv yüklenirken hata oluştu</p>';
+    archiveList.innerHTML = '<p class="empty-message">Arsiv yuklenirken hata olustu</p>';
   }
 }
 
-function toggleSelection(id: string, type: string) {
-  const key = `${type}-${id}`;
-  
+function toggleSelection(id: string, type: MediaRecord['type']) {
+  const key = buildSelectionKey(id, type);
+
   if (selectedMedia.has(key)) {
     selectedMedia.delete(key);
   } else {
     selectedMedia.add(key);
   }
-  
+
   updateSelectionUI();
 }
 
 function updateSelectionUI() {
   const archiveActions = document.getElementById('archiveActions');
   const selectedCount = document.getElementById('selectedCount');
-  const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
-  const cancelSelectionBtn = document.getElementById('cancelSelectionBtn');
-  
-  if (selectedMedia.size > 0) {
-    archiveActions!.style.display = 'flex';
-    selectedCount!.textContent = `${selectedMedia.size} seçili`;
-  } else {
-    archiveActions!.style.display = 'none';
+
+  if (!archiveActions || !selectedCount) {
+    return;
   }
-  
-  deleteSelectedBtn?.removeEventListener('click', handleDeleteSelected);
-  deleteSelectedBtn?.addEventListener('click', handleDeleteSelected);
-  
-  cancelSelectionBtn?.removeEventListener('click', handleCancelSelection);
-  cancelSelectionBtn?.addEventListener('click', handleCancelSelection);
+
+  if (selectedMedia.size > 0) {
+    archiveActions.style.display = 'flex';
+    selectedCount.textContent = `${selectedMedia.size} secili`;
+  } else {
+    archiveActions.style.display = 'none';
+  }
 }
 
 async function handleDeleteSelected() {
-  if (!confirm(`${selectedMedia.size} dosyayı silmek istediğinizden emin misiniz?`)) {
+  if (!confirm(`${selectedMedia.size} dosyayi silmek istediginizden emin misiniz?`)) {
     return;
   }
 
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    
+    const allMedia = await getAllMedia();
+
     for (const key of selectedMedia) {
-      const [type, id] = key.split('-');
-      
-      if (type === 'image') {
-        const images = await getAllMedia();
-        const image = images.find((m: any) => m.type === 'image' && m.id === parseInt(id));
-        if (image) {
-          await invoke('delete_converted_image', { id: parseInt(id), filePath: image.output_path });
-        }
-      } else {
-        const videos = await getAllMedia();
-        const video = videos.find((m: any) => m.type === 'video' && m.id === parseInt(id));
-        if (video) {
-          await invoke('delete_converted_video', { id: parseInt(id), filePath: video.output_path });
-        }
+      const { id, type } = parseSelectionKey(key);
+      const media = allMedia.find((item) => item.id === id && item.type === type);
+
+      if (media) {
+        await removeMediaRecord(media);
       }
     }
-    
+
     selectedMedia.clear();
     await loadArchive();
   } catch (error) {
@@ -161,31 +204,22 @@ async function handleDeleteSelected() {
 
 function handleCancelSelection() {
   selectedMedia.clear();
-  loadArchive();
+  void loadArchive();
 }
 
-async function deleteMediaHandler(id: string, type: string) {
+async function deleteMediaHandler(id: string, type: MediaRecord['type']) {
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    
-    // Get the file path from database
     const allMedia = await getAllMedia();
-    const mediaItem = allMedia.find((m: any) => m.type === type && m.id.toString() === id);
-    
+    const mediaItem = allMedia.find((item) => item.id === id && item.type === type);
+
     if (!mediaItem) {
       console.error('Media item not found:', id, type);
-      alert('Dosya bulunamadı');
+      alert('Dosya bulunamadi');
       return;
     }
-    
-    if (type === 'image') {
-      await invoke('delete_converted_image', { id: parseInt(id), filePath: mediaItem.output_path });
-      await deleteImageFromDB(id);
-    } else {
-      await invoke('delete_converted_video', { id: parseInt(id), filePath: mediaItem.output_path });
-      await deleteVideoFromDB(id);
-    }
-    
+
+    await removeMediaRecord(mediaItem);
+    selectedMedia.delete(buildSelectionKey(id, type));
     await loadArchive();
   } catch (error) {
     console.error('Delete error:', error);

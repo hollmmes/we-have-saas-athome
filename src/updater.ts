@@ -3,53 +3,53 @@ import { relaunch } from '@tauri-apps/plugin-process';
 
 export async function checkForUpdates(forcePrompt: boolean = false) {
   try {
-    console.log('Güncelleme kontrolü başlıyor...');
+    console.log('Guncelleme kontrolu basliyor...');
     const update = await check();
-    
+
     console.log('Update response:', update);
-    
-    if (update?.available) {
+
+    if (update.available) {
       console.log(`Update available: ${update.version}`);
-      
+
       const shouldUpdate = confirm(
-        `Yeni versiyon mevcut: ${update.version}\n\nŞimdi güncellemek ister misiniz?`
+        `Yeni versiyon mevcut: ${update.version}\n\nSimdi guncellemek ister misiniz?`
       );
-      
+
       if (shouldUpdate) {
-        console.log('Güncelleme indiriliyor...');
-        
+        console.log('Guncelleme indiriliyor...');
+
         await update.downloadAndInstall((progress) => {
           if (progress.event === 'Started') {
-            console.log('İndirme başladı...');
+            console.log('Indirme basladi...');
           } else if (progress.event === 'Progress') {
-            console.log(`İndirme: ${progress.data.chunkLength} bytes`);
+            console.log(`Indirme: ${progress.data.chunkLength} bytes`);
           } else if (progress.event === 'Finished') {
-            console.log('İndirme tamamlandı!');
+            console.log('Indirme tamamlandi!');
           }
         });
-        
+
         await relaunch();
       }
     } else if (forcePrompt) {
-      alert('Uygulama güncel. Yeni bir güncelleme bulunmuyor.');
+      alert('Uygulama guncel. Yeni bir guncelleme bulunmuyor.');
     }
   } catch (error) {
-    console.error('Güncelleme kontrolü hatası:', error);
+    console.error('Guncelleme kontrolu hatasi:', error);
     if (forcePrompt) {
-      alert('Güncelleme kontrolü sırasında bir hata oluştu.');
+      alert('Guncelleme kontrolu sirasinda bir hata olustu.');
     }
   }
 }
 
-export async function checkUpdateStatus(): Promise<{ available: boolean; version?: string }> {
+export async function checkUpdateStatus(): Promise<{ available: boolean; version: string }> {
   try {
     const update = await check();
     return {
-      available: update?.available || false,
-      version: update?.version
+      available: update.available || false,
+      version: update.version || ''
     };
   } catch (error) {
-    console.error('Güncelleme durumu kontrolü hatası:', error);
-    return { available: false };
+    console.error('Guncelleme durumu kontrolu hatasi:', error);
+    return { available: false, version: '' };
   }
 }

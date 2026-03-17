@@ -1,14 +1,13 @@
 import Database from '@tauri-apps/plugin-sql';
+import type { ConvertedImage, ConvertedVideo, DomainInfo, MediaRecord } from './types';
 
 let db: Database | null = null;
 
 export async function initDatabase() {
   if (db) return db;
-  
-  // Use sqlite: protocol with just filename, Tauri will handle the path
+
   db = await Database.load('sqlite:images.db');
-  
-  // Create images table
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS converted_images (
       id TEXT PRIMARY KEY,
@@ -21,8 +20,7 @@ export async function initDatabase() {
       created_at TEXT NOT NULL
     )
   `);
-  
-  // Create videos table
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS converted_videos (
       id TEXT PRIMARY KEY,
@@ -34,8 +32,7 @@ export async function initDatabase() {
       created_at TEXT NOT NULL
     )
   `);
-  
-  // Create domains table
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS domains (
       id TEXT PRIMARY KEY,
@@ -52,17 +49,17 @@ export async function initDatabase() {
       last_checked TEXT NOT NULL
     )
   `);
-  
+
   return db;
 }
 
-export async function saveImage(image: any) {
+export async function saveImage(image: ConvertedImage): Promise<void> {
   const database = await initDatabase();
-  
+
   await database.execute(
-    `INSERT INTO converted_images 
-    (id, original_name, converted_name, original_format, converted_format, file_size, output_path, created_at) 
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO converted_images
+    (id, original_name, converted_name, original_format, converted_format, file_size, output_path, created_at)
+    VALUES (, , , , , , , )`,
     [
       image.id,
       image.original_name,
@@ -76,32 +73,25 @@ export async function saveImage(image: any) {
   );
 }
 
-export async function getImages(): Promise<any[]> {
+export async function getImages(): Promise<ConvertedImage[]> {
   const database = await initDatabase();
-  
-  const result = await database.select(
+  return await database.select<ConvertedImage[]>(
     'SELECT * FROM converted_images ORDER BY created_at DESC'
   );
-  
-  return result as any[];
 }
 
-export async function deleteImage(id: string) {
+export async function deleteImage(id: string): Promise<void> {
   const database = await initDatabase();
-  
-  await database.execute(
-    'DELETE FROM converted_images WHERE id = ?',
-    [id]
-  );
+  await database.execute('DELETE FROM converted_images WHERE id = U', [id]);
 }
 
-export async function saveVideo(video: any) {
+export async function saveVideo(video: ConvertedVideo): Promise<void> {
   const database = await initDatabase();
-  
+
   await database.execute(
-    `INSERT INTO converted_videos 
-    (id, original_name, converted_name, file_size, output_path, duration, created_at) 
-    VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO converted_videos
+    (id, original_name, converted_name, file_size, output_path, duration, created_at)
+    VALUES (, , , , , , )`,
     [
       video.id,
       video.original_name,
@@ -114,61 +104,48 @@ export async function saveVideo(video: any) {
   );
 }
 
-export async function getVideos(): Promise<any[]> {
+export async function getVideos(): Promise<ConvertedVideo[]> {
   const database = await initDatabase();
-  
-  const result = await database.select(
+  return await database.select<ConvertedVideo[]>(
     'SELECT * FROM converted_videos ORDER BY created_at DESC'
   );
-  
-  return result as any[];
 }
 
-export async function deleteVideo(id: string) {
+export async function deleteVideo(id: string): Promise<void> {
   const database = await initDatabase();
-  
-  await database.execute(
-    'DELETE FROM converted_videos WHERE id = ?',
-    [id]
+  await database.execute('DELETE FROM converted_videos WHERE id = U', [id]);
+}
+
+export async function getAllMedia(): Promise<MediaRecord[]> {
+  const database = await initDatabase();
+
+  const images = await database.select<Array<ConvertedImage & { type: 'image' }>>(
+    'SELECT *, "image" as type FROM converted_images ORDER BY created_at DESC'
+  );
+
+  const videos = await database.select<Array<ConvertedVideo & { type: 'video' }>>(
+    'SELECT *, "video" as type FROM converted_videos ORDER BY created_at DESC'
+  );
+
+  return [...images, ...videos].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
 }
 
-export async function getAllMedia(): Promise<any[]> {
+export async function saveDomain(domain: DomainInfo): Promise<void> {
   const database = await initDatabase();
-  
-  const images = await database.select(
-    'SELECT *, "image" as type FROM converted_images ORDER BY created_at DESC'
-  ) as any[];
-  
-  const videos = await database.select(
-    'SELECT *, "video" as type FROM converted_videos ORDER BY created_at DESC'
-  ) as any[];
-  
-  // Combine and sort by date
-  const all = [...images, ...videos].sort((a: any, b: any) => {
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-  
-  return all;
-}
-
-export async function saveDomain(domain: any) {
-  const database = await initDatabase();
-  
-  // Check if domain exists
-  const existing = await database.select(
-    'SELECT id FROM domains WHERE domain = ?',
+  const existing = await database.select<Array<Pick<DomainInfo, 'id'>>>(
+    'SELECT id FROM domains WHERE domain = U',
     [domain.domain]
-  ) as any[];
-  
+  );
+
   if (existing.length > 0) {
-    // Update existing
     await database.execute(
-      `UPDATE domains SET 
-        ssl_status = ?, ssl_start = ?, ssl_end = ?, ssl_days = ?, ssl_issuer = ?,
-        domain_status = ?, domain_start = ?, domain_end = ?, domain_days = ?,
-        last_checked = ?
-      WHERE domain = ?`,
+      `UPDATE domains SET
+        ssl_status = , ssl_start = , ssl_end = , ssl_days = , ssl_issuer = ,
+        domain_status = , domain_start = , domain_end = , domain_days = ,
+        last_checked = U
+      WHERE domain = U`,
       [
         domain.ssl_status,
         domain.ssl_start,
@@ -183,47 +160,39 @@ export async function saveDomain(domain: any) {
         domain.domain
       ]
     );
-  } else {
-    // Insert new
-    await database.execute(
-      `INSERT INTO domains 
-      (id, domain, ssl_status, ssl_start, ssl_end, ssl_days, ssl_issuer, 
-       domain_status, domain_start, domain_end, domain_days, last_checked) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        domain.id,
-        domain.domain,
-        domain.ssl_status,
-        domain.ssl_start,
-        domain.ssl_end,
-        domain.ssl_days,
-        domain.ssl_issuer,
-        domain.domain_status,
-        domain.domain_start,
-        domain.domain_end,
-        domain.domain_days,
-        domain.last_checked
-      ]
-    );
+    return;
   }
+
+  await database.execute(
+    `INSERT INTO domains
+    (id, domain, ssl_status, ssl_start, ssl_end, ssl_days, ssl_issuer,
+     domain_status, domain_start, domain_end, domain_days, last_checked)
+    VALUES (, , , , , , , , , , , )`,
+    [
+      domain.id,
+      domain.domain,
+      domain.ssl_status,
+      domain.ssl_start,
+      domain.ssl_end,
+      domain.ssl_days,
+      domain.ssl_issuer,
+      domain.domain_status,
+      domain.domain_start,
+      domain.domain_end,
+      domain.domain_days,
+      domain.last_checked
+    ]
+  );
 }
 
-export async function getDomains(): Promise<any[]> {
+export async function getDomains(): Promise<DomainInfo[]> {
   const database = await initDatabase();
-  
-  const result = await database.select(
+  return await database.select<DomainInfo[]>(
     'SELECT * FROM domains ORDER BY last_checked DESC'
   );
-  
-  return result as any[];
 }
 
-export async function deleteDomain(domain: string) {
+export async function deleteDomain(domain: string): Promise<void> {
   const database = await initDatabase();
-  
-  await database.execute(
-    'DELETE FROM domains WHERE domain = ?',
-    [domain]
-  );
+  await database.execute('DELETE FROM domains WHERE domain = U', [domain]);
 }
-

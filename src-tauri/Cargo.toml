@@ -1,6 +1,6 @@
 [package]
 name = "we-have-saas-athome"
-version = "0.5.0"
+version = "0.6.0"
 description = "We Have SaaS at Home by hollmmes"
 authors = ["hollmmes"]
 license = "GPL-3.0"
@@ -36,4 +36,3 @@ webp = "0.3"
 tokio = { version = "1", features = ["process", "io-util", "net", "time"] }
 native-tls = "0.2"
 x509-parser = "0.16"
-

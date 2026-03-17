@@ -631,13 +631,13 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (savedPath && folderPath) {
         folderPath.textContent = savedPath;
         folderStructure!.style.display = 'block';
-        setupCard?.classList.add('setup-complete');
+        setupCard.classList.add('setup-complete');
         return true;
       }
       return false;
     }
 
-    selectFolderBtn?.addEventListener('click', async () => {
+    selectFolderBtn.addEventListener('click', async () => {
       const { open } = await import('@tauri-apps/plugin-dialog');
       
       const selected = await open({
@@ -650,7 +650,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         localStorage.setItem('outputPath', selected);
         folderPath!.textContent = selected;
         folderStructure!.style.display = 'block';
-        setupCard?.classList.add('setup-complete');
+        setupCard.classList.add('setup-complete');
         
         // Create subfolders
         try {
@@ -680,14 +680,14 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // Güncelleme durumu kontrolü
     const updateStatusBtn = document.getElementById("updateStatusBtn");
-    const updateText = updateStatusBtn?.querySelector('.update-text');
+    const updateText = updateStatusBtn.querySelector('.update-text');
     
     async function checkUpdateStatus() {
       try {
         const { check } = await import('@tauri-apps/plugin-updater');
         const update = await check();
         
-        if (update?.available && updateStatusBtn && updateText) {
+        if (update.available && updateStatusBtn && updateText) {
           // Güncelleme mevcut
           updateStatusBtn.classList.add('update-available');
           updateText.textContent = `Güncelleme mevcut: ${update.version}`;
@@ -706,7 +706,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     checkUpdateStatus();
 
     // Güncelleme butonuna tıklandığında
-    updateStatusBtn?.addEventListener("click", () => {
+    updateStatusBtn.addEventListener("click", () => {
       checkForUpdates();
     });
 
@@ -729,9 +729,9 @@ window.addEventListener("DOMContentLoaded", async () => {
             
             // Navigate to home
             navItems.forEach(nav => nav.classList.remove('active'));
-            document.querySelector('[data-page="home"]')?.classList.add('active');
+            document.querySelector('[data-page="home"]').classList.add('active');
             pages.forEach(page => page.classList.remove('active'));
-            document.getElementById('homePage')?.classList.add('active');
+            document.getElementById('homePage').classList.add('active');
             
             return;
           }
@@ -770,7 +770,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         
         // Close sidebar on mobile
         if (window.innerWidth < 768) {
-          sidebar?.classList.remove('open');
+          sidebar.classList.remove('open');
         }
       });
     });
@@ -782,7 +782,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     let selectedFiles: string[] = [];
 
     // Click to select files using Tauri dialog
-    dropZone?.addEventListener('click', async () => {
+    dropZone.addEventListener('click', async () => {
       const { open } = await import('@tauri-apps/plugin-dialog');
       
       const selected = await open({
@@ -794,7 +794,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       });
       
       if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
+        const paths = Array.isArray(selected)  selected : [selected];
         addFilesToSelection(paths);
       }
     });
@@ -806,30 +806,30 @@ window.addEventListener("DOMContentLoaded", async () => {
       await listen('tauri://drag-over', () => {
         // Check which page is active
         const activePage = document.querySelector('.page-content.active');
-        const activePageId = activePage?.id;
+        const activePageId = activePage.id;
         
         if (activePageId === 'converterPage') {
-          dropZone?.classList.add('drag-over');
+          dropZone.classList.add('drag-over');
         } else if (activePageId === 'videoPage') {
           const activeTab = document.querySelector('.tab-content.active');
-          if (activeTab?.id === 'optimizeTab') {
-            videoDropZone?.classList.add('drag-over');
-          } else if (activeTab?.id === 'mergeTab') {
-            mergeDropZone?.classList.add('drag-over');
+          if (activeTab.id === 'optimizeTab') {
+            videoDropZone.classList.add('drag-over');
+          } else if (activeTab.id === 'mergeTab') {
+            mergeDropZone.classList.add('drag-over');
           }
         }
       });
 
       await listen('tauri://drag-drop', async (event: any) => {
-        dropZone?.classList.remove('drag-over');
-        videoDropZone?.classList.remove('drag-over');
-        mergeDropZone?.classList.remove('drag-over');
+        dropZone.classList.remove('drag-over');
+        videoDropZone.classList.remove('drag-over');
+        mergeDropZone.classList.remove('drag-over');
         
         const paths = event.payload.paths as string[];
         if (paths && paths.length > 0) {
           // Check which page is active
           const activePage = document.querySelector('.page-content.active');
-          const activePageId = activePage?.id;
+          const activePageId = activePage.id;
           
           if (activePageId === 'converterPage') {
             // Image converter page
@@ -837,9 +837,9 @@ window.addEventListener("DOMContentLoaded", async () => {
           } else if (activePageId === 'videoPage') {
             // Video page
             const activeTab = document.querySelector('.tab-content.active');
-            if (activeTab?.id === 'optimizeTab') {
+            if (activeTab.id === 'optimizeTab') {
               addVideosToSelection(paths);
-            } else if (activeTab?.id === 'mergeTab') {
+            } else if (activeTab.id === 'mergeTab') {
               addVideosToMerge(paths);
             }
           }
@@ -847,9 +847,9 @@ window.addEventListener("DOMContentLoaded", async () => {
       });
 
       await listen('tauri://drag-leave', () => {
-        dropZone?.classList.remove('drag-over');
-        videoDropZone?.classList.remove('drag-over');
-        mergeDropZone?.classList.remove('drag-over');
+        dropZone.classList.remove('drag-over');
+        videoDropZone.classList.remove('drag-over');
+        mergeDropZone.classList.remove('drag-over');
       });
     }
 
@@ -859,7 +859,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       // Filter only image files
       const imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'tiff', 'tif', 'ico'];
       const imagePaths = paths.filter(path => {
-        const ext = path.split('.').pop()?.toLowerCase();
+        const ext = path.split('.').pop().toLowerCase();
         return ext && imageExtensions.includes(ext);
       });
       
@@ -930,7 +930,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         slider.addEventListener('input', (e) => {
           const target = e.target as HTMLInputElement;
           const value = target.value;
-          const valueSpan = target.parentElement?.querySelector('.quality-value');
+          const valueSpan = target.parentElement.querySelector('.quality-value');
           if (valueSpan) {
             valueSpan.textContent = value;
           }
@@ -964,8 +964,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         const formatSelect = fileItem.querySelector('.format-select') as HTMLSelectElement;
         const qualitySlider = fileItem.querySelector('.quality-slider') as HTMLInputElement;
         
-        const format = formatSelect?.value || 'webp';
-        const quality = parseInt(qualitySlider?.value || '85');
+        const format = formatSelect.value || 'webp';
+        const quality = parseInt(qualitySlider.value || '85');
         
         await convertFile(filePath, format, quality);
       }
@@ -996,7 +996,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           <div class="progress-bar"></div>
         </div>
       `;
-      conversionQueue?.appendChild(queueItem);
+      conversionQueue.appendChild(queueItem);
 
       try {
         // Convert image
@@ -1064,7 +1064,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           const escapedPath = img.output_path.replace(/\\/g, '\\\\');
           return `
           <div class="result-card">
-            ${img.dataUrl ? `
+            ${img.dataUrl  `
             <div class="result-preview">
               <img src="${img.dataUrl}" alt="${img.converted_name}" />
             </div>
@@ -1119,12 +1119,12 @@ window.addEventListener("DOMContentLoaded", async () => {
         tabContents.forEach(c => c.classList.remove('active'));
         
         btn.classList.add('active');
-        document.getElementById(`${tab}Tab`)?.classList.add('active');
+        document.getElementById(`${tab}Tab`).classList.add('active');
       });
     });
     
     // Video file selection for optimize
-    videoDropZone?.addEventListener('click', async () => {
+    videoDropZone.addEventListener('click', async () => {
       const { open } = await import('@tauri-apps/plugin-dialog');
       
       const selected = await open({
@@ -1136,13 +1136,13 @@ window.addEventListener("DOMContentLoaded", async () => {
       });
       
       if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
+        const paths = Array.isArray(selected)  selected : [selected];
         addVideosToSelection(paths);
       }
     });
     
     // Video file selection for merge
-    mergeDropZone?.addEventListener('click', async () => {
+    mergeDropZone.addEventListener('click', async () => {
       const { open } = await import('@tauri-apps/plugin-dialog');
       
       const selected = await open({
@@ -1154,7 +1154,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       });
       
       if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
+        const paths = Array.isArray(selected)  selected : [selected];
         addVideosToMerge(paths);
       }
     });
@@ -1282,7 +1282,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         const fileItem = fileItems[i];
         
         const qualitySelect = fileItem.querySelector('.format-select') as HTMLSelectElement;
-        const quality = qualitySelect?.value || 'medium';
+        const quality = qualitySelect.value || 'medium';
         
         await optimizeVideo(filePath, quality);
       }
@@ -1308,7 +1308,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           <div class="progress-bar"></div>
         </div>
       `;
-      videoQueue?.appendChild(queueItem);
+      videoQueue.appendChild(queueItem);
       
       try {
         const result: any = await invoke('optimize_video', {
@@ -1337,7 +1337,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     }
     
-    mergeVideosBtn?.addEventListener('click', async () => {
+    mergeVideosBtn.addEventListener('click', async () => {
       if (mergeVideos.length < 2) {
         alert('En az 2 video seçmelisiniz!');
         return;
@@ -1357,7 +1357,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           <div class="progress-bar"></div>
         </div>
       `;
-      mergeQueue?.appendChild(queueItem);
+      mergeQueue.appendChild(queueItem);
       
       try {
         const result: any = await invoke('merge_videos', {
@@ -1423,7 +1423,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           const escapedPath = video.output_path.replace(/\\/g, '\\\\');
           return `
           <div class="result-card video-card">
-            <div class="video-preview" onclick='playVideo(\`${escapedPath}\`, "${video.converted_name}")' style="${video.thumbnail ? `background-image: url('${video.thumbnail}'); background-size: cover; background-position: center;` : ''}">
+            <div class="video-preview" onclick='playVideo(\`${escapedPath}\`, "${video.converted_name}")' style="${video.thumbnail  `background-image: url('${video.thumbnail}'); background-size: cover; background-position: center;` : ''}">
               <i data-lucide="play" class="play-icon"></i>
               <span class="video-duration">${video.duration}</span>
             </div>
@@ -1500,12 +1500,12 @@ window.addEventListener("DOMContentLoaded", async () => {
           return `
           <div class="archive-item" data-id="${item.id}" data-type="${item.type}">
             <input type="checkbox" class="archive-checkbox" data-id="${item.id}" data-path="${escapedPath}" data-type="${item.type}">
-            ${isVideo ? `
-            <div class="archive-preview video-preview-small" onclick='playVideo(\`${escapedPath}\`, "${item.converted_name}")' style="${item.dataUrl ? `background-image: url('${item.dataUrl}'); background-size: cover; background-position: center;` : ''}">
+            ${isVideo  `
+            <div class="archive-preview video-preview-small" onclick='playVideo(\`${escapedPath}\`, "${item.converted_name}")' style="${item.dataUrl  `background-image: url('${item.dataUrl}'); background-size: cover; background-position: center;` : ''}">
               <i data-lucide="play"></i>
               <span class="video-duration-small">${item.duration}</span>
             </div>
-            ` : item.dataUrl ? `
+            ` : item.dataUrl  `
             <div class="archive-preview">
               <img src="${item.dataUrl}" alt="${item.converted_name}" />
             </div>
@@ -1513,7 +1513,7 @@ window.addEventListener("DOMContentLoaded", async () => {
             <div class="archive-item-info">
               <h4>${item.converted_name}</h4>
               <p class="archive-meta">
-                ${isVideo ? `
+                ${isVideo  `
                   <span>Video (${item.duration})</span>
                 ` : `
                   <span>${item.original_format} → ${item.converted_format}</span>
@@ -1564,12 +1564,12 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // Delete selected items
     const deleteSelectedBtn = document.getElementById('deleteSelectedBtn');
-    deleteSelectedBtn?.addEventListener('click', async () => {
+    deleteSelectedBtn.addEventListener('click', async () => {
       const checkboxes = document.querySelectorAll('.archive-checkbox:checked') as NodeListOf<HTMLInputElement>;
       
       if (checkboxes.length === 0) return;
       
-      if (!confirm(`${checkboxes.length} fotoğrafı silmek istediğinizden emin misiniz?`)) {
+      if (!confirm(`${checkboxes.length} fotoğrafı silmek istediğinizden emin misinizU`)) {
         return;
       }
 
@@ -1597,7 +1597,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // Cancel selection
     const cancelSelectionBtn = document.getElementById('cancelSelectionBtn');
-    cancelSelectionBtn?.addEventListener('click', () => {
+    cancelSelectionBtn.addEventListener('click', () => {
       const checkboxes = document.querySelectorAll('.archive-checkbox:checked') as NodeListOf<HTMLInputElement>;
       checkboxes.forEach(checkbox => {
         checkbox.checked = false;
@@ -1701,18 +1701,18 @@ window.addEventListener("DOMContentLoaded", async () => {
     const menuToggle = document.getElementById("menuToggle");
     const sidebar = document.getElementById("sidebar");
 
-    menuToggle?.addEventListener("click", () => {
-      sidebar?.classList.toggle("open");
+    menuToggle.addEventListener("click", () => {
+      sidebar.classList.toggle("open");
     });
 
     // Close sidebar when clicking outside on mobile
     document.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
       if (window.innerWidth < 768 && 
-          !sidebar?.contains(target) && 
-          !menuToggle?.contains(target) &&
-          sidebar?.classList.contains("open")) {
-        sidebar?.classList.remove("open");
+          !sidebar.contains(target) && 
+          !menuToggle.contains(target) &&
+          sidebar.classList.contains("open")) {
+        sidebar.classList.remove("open");
       }
     });
 
@@ -1733,8 +1733,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     const resizeFileInput = document.getElementById('resizeFileInput') as HTMLInputElement;
 
     function refreshResizeGallery() {
-      resizeW = parseInt(resizeWidthInput?.value || '350');
-      resizeH = parseInt(resizeHeightInput?.value || '390');
+      resizeW = parseInt(resizeWidthInput.value || '350');
+      resizeH = parseInt(resizeHeightInput.value || '390');
       
       if (resizeGallery) {
         resizeGallery.innerHTML = '';
@@ -1743,34 +1743,34 @@ window.addEventListener("DOMContentLoaded", async () => {
       renderResizeBadges();
     }
 
-    resizeWidthInput?.addEventListener('input', refreshResizeGallery);
-    resizeHeightInput?.addEventListener('input', refreshResizeGallery);
+    resizeWidthInput.addEventListener('input', refreshResizeGallery);
+    resizeHeightInput.addEventListener('input', refreshResizeGallery);
 
     // File input
-    resizeFileInput?.addEventListener('change', (e) => {
+    resizeFileInput.addEventListener('change', (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files) handleResizeFiles(files);
     });
 
     // Drop zone click
-    resizeDropZone?.addEventListener('click', () => {
-      resizeFileInput?.click();
+    resizeDropZone.addEventListener('click', () => {
+      resizeFileInput.click();
     });
 
     // Drag & drop
-    resizeDropZone?.addEventListener('dragover', (e) => {
+    resizeDropZone.addEventListener('dragover', (e) => {
       e.preventDefault();
       resizeDropZone.classList.add('drag-over');
     });
 
-    resizeDropZone?.addEventListener('dragleave', () => {
+    resizeDropZone.addEventListener('dragleave', () => {
       resizeDropZone.classList.remove('drag-over');
     });
 
-    resizeDropZone?.addEventListener('drop', (e) => {
+    resizeDropZone.addEventListener('drop', (e) => {
       e.preventDefault();
       resizeDropZone.classList.remove('drag-over');
-      const files = e.dataTransfer?.files;
+      const files = e.dataTransfer.files;
       if (files) handleResizeFiles(files);
     });
 
@@ -1790,7 +1790,7 @@ window.addEventListener("DOMContentLoaded", async () => {
             if (downloadAllBtn) downloadAllBtn.disabled = false;
             if (clearBtn) clearBtn.disabled = false;
           };
-          img.src = ev.target?.result as string;
+          img.src = ev.target.result as string;
         };
         reader.readAsDataURL(file);
       });
@@ -1834,7 +1834,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       };
       
       wrap.appendChild(btn);
-      resizeGallery?.appendChild(wrap);
+      resizeGallery.appendChild(wrap);
     }
 
     function renderResizeBadges() {
@@ -1844,20 +1844,20 @@ window.addEventListener("DOMContentLoaded", async () => {
       container.innerHTML = '';
       resizeBadges.forEach((badge, index) => {
         const badgeEl = document.createElement('div');
-        badgeEl.className = `resize-badge ${resizeW === badge.w && resizeH === badge.h ? 'active' : ''}`;
+        badgeEl.className = `resize-badge ${resizeW === badge.w && resizeH === badge.h  'active' : ''}`;
         
         badgeEl.innerHTML = `
           <span class="badge-text">${badge.w} × ${badge.h}</span>
           <span class="badge-remove">×</span>
         `;
         
-        badgeEl.querySelector('.badge-text')?.addEventListener('click', () => {
+        badgeEl.querySelector('.badge-text').addEventListener('click', () => {
           resizeWidthInput.value = badge.w.toString();
           resizeHeightInput.value = badge.h.toString();
           refreshResizeGallery();
         });
         
-        badgeEl.querySelector('.badge-remove')?.addEventListener('click', (e) => {
+        badgeEl.querySelector('.badge-remove').addEventListener('click', (e) => {
           e.stopPropagation();
           resizeBadges.splice(index, 1);
           renderResizeBadges();
@@ -1868,15 +1868,15 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Save dimension button
-    document.getElementById('saveDimensionBtn')?.addEventListener('click', () => {
-      const w = parseInt(resizeWidthInput?.value || '350');
-      const h = parseInt(resizeHeightInput?.value || '390');
+    document.getElementById('saveDimensionBtn').addEventListener('click', () => {
+      const w = parseInt(resizeWidthInput.value || '350');
+      const h = parseInt(resizeHeightInput.value || '390');
       resizeBadges.push({ w, h });
       renderResizeBadges();
     });
 
     // Clear button
-    document.getElementById('clearResizeBtn')?.addEventListener('click', () => {
+    document.getElementById('clearResizeBtn').addEventListener('click', () => {
       if (resizeGallery) resizeGallery.innerHTML = '';
       originalResizeImages = [];
       
@@ -1887,9 +1887,9 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
 
     // Download all button
-    document.getElementById('downloadAllBtn')?.addEventListener('click', () => {
-      const canvases = resizeGallery?.querySelectorAll('canvas');
-      canvases?.forEach((canvas, i) => {
+    document.getElementById('downloadAllBtn').addEventListener('click', () => {
+      const canvases = resizeGallery.querySelectorAll('canvas');
+      canvases.forEach((canvas, i) => {
         const a = document.createElement('a');
         a.download = `${resizeW}x${resizeH}-${originalResizeImages[i].name}.jpg`;
         a.href = canvas.toDataURL('image/jpeg', 0.92);
@@ -1918,7 +1918,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     function convertSeoKeywords() {
-      const input = (document.getElementById('seoInputText') as HTMLTextAreaElement)?.value || '';
+      const input = (document.getElementById('seoInputText') as HTMLTextAreaElement).value || '';
       const lines = input.split('\n').filter(l => l.trim() !== '');
 
       if (lines.length === 0) {
@@ -1931,7 +1931,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       (document.getElementById('seoJoinedResult') as HTMLTextAreaElement).value = joined;
 
       // 2. SLUG (URL)
-      const maxLen = parseInt((document.getElementById('seoMaxLen') as HTMLInputElement)?.value || '150');
+      const maxLen = parseInt((document.getElementById('seoMaxLen') as HTMLInputElement).value || '150');
       let urlLines = lines.map(l => metinToUrl(l));
       let urlJoined = urlLines.join('-');
       
@@ -1952,7 +1952,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // SEO Convert button
     const seoConvertBtn = document.getElementById('seoConvertBtn');
-    seoConvertBtn?.addEventListener('click', convertSeoKeywords);
+    seoConvertBtn.addEventListener('click', convertSeoKeywords);
 
     // Copy to clipboard function
     (window as any).copyToClipboard = async (elementId: string) => {
@@ -2021,7 +2021,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     const refreshDbStatsBtn = document.getElementById('refreshDbStatsBtn');
-    refreshDbStatsBtn?.addEventListener('click', async () => {
+    refreshDbStatsBtn.addEventListener('click', async () => {
       await loadDatabaseStats();
       alert('İstatistikler güncellendi!');
     });
@@ -2089,29 +2089,29 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
 
     // File upload
-    cropUploadArea?.addEventListener('click', () => {
-      cropFileInput?.click();
+    cropUploadArea.addEventListener('click', () => {
+      cropFileInput.click();
     });
 
-    cropFileInput?.addEventListener('change', (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
+    cropFileInput.addEventListener('change', (e) => {
+      const file = (e.target as HTMLInputElement).files.[0];
       if (file) loadCropImage(file);
     });
 
     // Drag & drop
-    cropUploadArea?.addEventListener('dragover', (e) => {
+    cropUploadArea.addEventListener('dragover', (e) => {
       e.preventDefault();
       cropUploadArea.classList.add('drag-over');
     });
 
-    cropUploadArea?.addEventListener('dragleave', () => {
+    cropUploadArea.addEventListener('dragleave', () => {
       cropUploadArea.classList.remove('drag-over');
     });
 
-    cropUploadArea?.addEventListener('drop', (e) => {
+    cropUploadArea.addEventListener('drop', (e) => {
       e.preventDefault();
       cropUploadArea.classList.remove('drag-over');
-      const file = e.dataTransfer?.files[0];
+      const file = e.dataTransfer.files[0];
       if (file && file.type.startsWith('image/')) {
         loadCropImage(file);
       }
@@ -2129,7 +2129,7 @@ window.addEventListener("DOMContentLoaded", async () => {
           cropCanvasWrapper!.style.display = 'block';
           createIcons({ icons: allIcons });
         };
-        img.src = e.target?.result as string;
+        img.src = e.target.result as string;
       };
       reader.readAsDataURL(file);
     }
@@ -2221,7 +2221,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (cropRatio) {
         if (cropState.aspectRatio > 0) {
           const activeTemplate = document.querySelector('.template-btn.active');
-          cropRatio.textContent = activeTemplate?.querySelector('span')?.textContent || 'Sabit Oran';
+          cropRatio.textContent = activeTemplate.querySelector('span').textContent || 'Sabit Oran';
         } else {
           cropRatio.textContent = 'Serbest';
         }
@@ -2229,7 +2229,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Crop box dragging and resizing
-    cropBox?.addEventListener('mousedown', (e) => {
+    cropBox.addEventListener('mousedown', (e) => {
       const target = e.target as HTMLElement;
       
       if (target.classList.contains('crop-handle')) {
@@ -2324,18 +2324,18 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Reset button
-    cropResetBtn?.addEventListener('click', () => {
+    cropResetBtn.addEventListener('click', () => {
       resetCropBox();
     });
 
     // Rotate button
-    cropRotateBtn?.addEventListener('click', () => {
+    cropRotateBtn.addEventListener('click', () => {
       cropState.rotation = (cropState.rotation + 90) % 360;
       drawCropCanvas();
     });
 
     // Save button
-    cropSaveBtn?.addEventListener('click', () => {
+    cropSaveBtn.addEventListener('click', () => {
       if (!cropImage || !cropCanvas) return;
       
       const scaleX = cropImage.width / cropCanvas.width;
@@ -2390,8 +2390,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         }
 
         domainTableBody.innerHTML = domains.map(domain => {
-          const sslStatusClass = domain.ssl_status.includes('✅') ? 'success' : 'danger';
-          const domainStatusClass = domain.domain_status.includes('✅') ? 'success' : 'danger';
+          const sslStatusClass = domain.ssl_status.includes('✅')  'success' : 'danger';
+          const domainStatusClass = domain.domain_status.includes('✅')  'success' : 'danger';
           
           return `
             <tr>
@@ -2418,8 +2418,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    addDomainBtn?.addEventListener('click', async () => {
-      const domain = domainInput?.value.trim();
+    addDomainBtn.addEventListener('click', async () => {
+      const domain = domainInput.value.trim();
       
       if (!domain) {
         alert('Lütfen bir domain girin!');
@@ -2452,7 +2452,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       }
     });
 
-    refreshAllDomainsBtn?.addEventListener('click', async () => {
+    refreshAllDomainsBtn.addEventListener('click', async () => {
       const domains = await getDomains();
       
       if (domains.length === 0) {
@@ -2487,7 +2487,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
 
     (window as any).deleteDomainEntry = async (domain: string) => {
-      if (!confirm(`${domain} domain'ini silmek istediğinizden emin misiniz?`)) {
+      if (!confirm(`${domain} domain'ini silmek istediğinizden emin misinizU`)) {
         return;
       }
 

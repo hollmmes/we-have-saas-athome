@@ -1,1 +1,47 @@
-{"$schema":"../gen/schemas/desktop-schema.json","identifier":"default","description":"Capability for the main window","windows":["main"],"permissions":["core:default","opener:default","updater:default","updater:allow-check","updater:allow-download","updater:allow-install","process:default","process:allow-restart","dialog:default","dialog:allow-open","fs:default","fs:allow-appdata-read-recursive","fs:allow-appdata-write-recursive","fs:allow-exists","fs:allow-mkdir","fs:allow-read-file","fs:allow-write-file","fs:allow-remove","core:path:default","core:path:allow-resolve-directory","sql:default","sql:allow-load","sql:allow-execute","sql:allow-select"]}
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "updater:default",
+    "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
+    "process:default",
+    "process:allow-restart",
+    "dialog:default",
+    "dialog:allow-open",
+    "fs:default",
+    "fs:allow-appdata-read-recursive",
+    "fs:allow-appdata-write-recursive",
+    {
+      "identifier": "fs:allow-exists",
+      "allow": ["$HOME/**"]
+    },
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": ["$HOME/**"]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": ["$HOME/**"]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": ["$HOME/**"]
+    },
+    {
+      "identifier": "fs:allow-remove",
+      "allow": ["$HOME/**"]
+    },
+    "core:path:default",
+    "core:path:allow-resolve-directory",
+    "sql:default",
+    "sql:allow-load",
+    "sql:allow-execute",
+    "sql:allow-select"
+  ]
+}
